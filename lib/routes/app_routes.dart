@@ -7,6 +7,12 @@ import '../features/settings/screens/settings_screen.dart';
 import '../features/settings/screens/user_management_screen.dart';
 import '../features/settings/screens/backup_restore_screen.dart';
 import '../features/settings/screens/activity_logs_screen.dart';
+import '../features/owner_controls/screens/investor_management_screen.dart';
+import '../features/owner_controls/screens/loan_management_screen.dart';
+import '../features/owner_controls/screens/money_lent_screen.dart';
+import '../features/owner_controls/screens/policy_control_screen.dart';
+import '../features/owner_controls/screens/discount_management_screen.dart';
+import '../features/owner_controls/screens/supplier_management_screen.dart';
 import '../core/models/product_model.dart';
 
 class AppRoute {
@@ -20,6 +26,14 @@ class AppRoute {
   static const String userManagementScreen = "/user-management";
   static const String backupSyncScreen = "/backup-sync";
   static const String activityLogsScreen = "/activity-logs";
+
+  // Owner & Governance Routes
+  static const String investorManagementScreen = "/investors";
+  static const String loanManagementScreen = "/loans";
+  static const String moneyLentScreen = "/money-lent";
+  static const String policyControlScreen = "/policies";
+  static const String discountManagementScreen = "/discounts";
+  static const String supplierManagementScreen = "/suppliers";
 
   // ---------------------------------------------------------------------------
   // Router Configuration
@@ -81,6 +95,54 @@ class AppRoute {
           context: context,
           state: state,
           child: const ActivityLogsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: investorManagementScreen,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const InvestorManagementScreen(),
+        ),
+      ),
+      GoRoute(
+        path: loanManagementScreen,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const LoanManagementScreen(),
+        ),
+      ),
+      GoRoute(
+        path: moneyLentScreen,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const MoneyLentScreen(),
+        ),
+      ),
+      GoRoute(
+        path: policyControlScreen,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const PolicyControlScreen(),
+        ),
+      ),
+      GoRoute(
+        path: discountManagementScreen,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const DiscountManagementScreen(),
+        ),
+      ),
+      GoRoute(
+        path: supplierManagementScreen,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const SupplierManagementScreen(),
         ),
       ),
     ],

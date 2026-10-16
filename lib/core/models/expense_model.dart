@@ -6,6 +6,9 @@ class Expense {
   final double amount;
   final String notes;
   final DateTime date;
+  final String creatorId;
+  final String creatorName;
+  final String creatorRole;
   final DateTime createdAt;
 
   Expense({
@@ -14,6 +17,9 @@ class Expense {
     required this.amount,
     this.notes = '',
     DateTime? date,
+    this.creatorId = '',
+    this.creatorName = 'Staff',
+    this.creatorRole = 'Staff',
     DateTime? createdAt,
   })  : date = date ?? DateTime.now(),
         createdAt = createdAt ?? DateTime.now();
@@ -32,6 +38,9 @@ class Expense {
       amount: (data['amount'] ?? 0.0).toDouble(),
       notes: data['notes'] ?? '',
       date: parseDate(data['date']),
+      creatorId: data['creatorId'] ?? '',
+      creatorName: data['creatorName'] ?? 'Staff',
+      creatorRole: data['creatorRole'] ?? 'Staff',
       createdAt: parseDate(data['createdAt']),
     );
   }
@@ -43,7 +52,34 @@ class Expense {
       'amount': amount,
       'notes': notes,
       'date': date.toIso8601String(),
+      'creatorId': creatorId,
+      'creatorName': creatorName,
+      'creatorRole': creatorRole,
       'createdAt': createdAt.toIso8601String(),
     };
+  }
+
+  Expense copyWith({
+    String? id,
+    String? category,
+    double? amount,
+    String? notes,
+    DateTime? date,
+    String? creatorId,
+    String? creatorName,
+    String? creatorRole,
+    DateTime? createdAt,
+  }) {
+    return Expense(
+      id: id ?? this.id,
+      category: category ?? this.category,
+      amount: amount ?? this.amount,
+      notes: notes ?? this.notes,
+      date: date ?? this.date,
+      creatorId: creatorId ?? this.creatorId,
+      creatorName: creatorName ?? this.creatorName,
+      creatorRole: creatorRole ?? this.creatorRole,
+      createdAt: createdAt ?? this.createdAt,
+    );
   }
 }

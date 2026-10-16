@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../controllers/settings_controller.dart';
 import '../../../core/services/theme_language_service.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/services/permission_service.dart';
 import '../../../core/utils/constants/app_constants.dart';
 import '../../../core/utils/sizer.dart';
 import '../../../core/utils/constants/colors.dart';
@@ -19,6 +20,7 @@ class SettingsScreen extends StatelessWidget {
     final SettingsController controller = Get.put(SettingsController());
     final ThemeLanguageService themeService = Get.find<ThemeLanguageService>();
     final AuthService auth = Get.find<AuthService>();
+    final PermissionService perm = Get.find<PermissionService>();
 
     return CommonBackgroundScaffold(
       appBar: AppBar(
@@ -38,8 +40,8 @@ class SettingsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. User Profile & Role Card
-            _buildUserProfileCard(auth, controller, themeService),
+            // 1. User Profile & Fast Role Switcher
+            _buildUserProfileCard(auth, perm, themeService),
             20.verticalSpace,
 
             // 2. 3-Tier Theme Engine (Light, Dark, Midnight)
@@ -48,17 +50,60 @@ class SettingsScreen extends StatelessWidget {
             _buildThemeSelector(controller, themeService),
             20.verticalSpace,
 
-            // 3. Language & Currency Selector (English / বাংলা)
+            // 3. Language Selector (English / বাংলা)
             _buildSectionHeader('language_title'.tr, Icons.language_rounded, themeService),
             8.verticalSpace,
             _buildLanguageSelector(controller, themeService),
             20.verticalSpace,
 
-            // 4. Administration & Management (RBAC & Backup)
-            _buildSectionHeader('Administration & Security', Icons.admin_panel_settings_rounded, themeService),
-            8.verticalSpace,
-            _buildAdminMenu(context, controller, themeService),
-            24.verticalSpace,
+            // 4. Owner & Manager Governance Hub (Spec Section 16 & RBAC)
+            if (perm.isOwner || perm.isManager) ...[
+              _buildSectionHeader('Owner & Management Control Hub', Icons.security_rounded, themeService),
+              8.verticalSpace,
+              _buildOwnerGovernanceMenu(context, perm, themeService),
+              20.verticalSpace,
+            ] else ...[
+              // Staff Notice Banner
+              Container(
+                padding: EdgeInsets.all(14.w),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14.r),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.shield_outlined, color: AppColors.primary, size: 24.w),
+                    12.horizontalSpace,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Staff Operational Mode',
+                            style: getTextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
+                          ),
+                          2.verticalSpace,
+                          Text(
+                            'Financial accounting, capital records, and administrative controls are restricted to Managers and Owners.',
+                            style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w400, color: themeService.subtextColor),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              20.verticalSpace,
+            ],
+
+            // 5. Administration & Security (Backup & Audit)
+            if (!perm.isStaff) ...[
+              _buildSectionHeader('Administration & Security', Icons.admin_panel_settings_rounded, themeService),
+              8.verticalSpace,
+              _buildAdminMenu(context, controller, perm, themeService),
+              24.verticalSpace,
+            ],
 
             // App Tagline & Footer
             Center(
@@ -83,8 +128,8 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  // --- 1. User Profile & Role Switcher ---
-  Widget _buildUserProfileCard(AuthService auth, SettingsController controller, ThemeLanguageService themeService) {
+  // --- 1. User Profile & Fast Role Switcher ---
+  Widget _buildUserProfileCard(AuthService auth, PermissionService perm, ThemeLanguageService themeService) {
     return Obx(() {
       final user = auth.currentUser.value;
       return Container(
@@ -132,20 +177,42 @@ class SettingsScreen extends StatelessWidget {
                         ),
                       ),
                       6.verticalSpace,
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6.r),
-                        ),
-                        child: Text(
-                          user?.role ?? 'Super Admin',
-                          style: getTextStyle(
-                            fontSize: 11.sp,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
+                      Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6.r),
+                            ),
+                            child: Text(
+                              user?.role ?? AppConstants.roleOwner,
+                              style: getTextStyle(
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
+                            ),
                           ),
-                        ),
+                          8.horizontalSpace,
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6.r),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.verified_user_rounded, size: 12.w, color: AppColors.secondary),
+                                4.horizontalSpace,
+                                Text(
+                                  '2FA Active',
+                                  style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.secondary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -155,28 +222,39 @@ class SettingsScreen extends StatelessWidget {
             12.verticalSpace,
             Divider(color: themeService.inputBorderColor),
             8.verticalSpace,
-            // Quick Role Switcher for Testing / Demo
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+            // Quick Role Switcher Chips for Demo / Testing (Spec 3-Tier Verification)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Switch Active Role:',
-                  style: getTextStyle(fontSize: 12.sp, fontWeight: FontWeight.w500, color: themeService.subtextColor),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Live Role Switcher (RBAC Test):',
+                      style: getTextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: themeService.subtextColor),
+                    ),
+                    Text(
+                      'Active: ${user?.role}',
+                      style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: AppColors.primary),
+                    ),
+                  ],
                 ),
-                DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: user?.role ?? AppConstants.roleOwner,
-                    dropdownColor: themeService.cardColor,
-                    style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 12.sp),
-                    items: AppConstants.userRoles.map((r) {
-                      return DropdownMenuItem(value: r, child: Text(r));
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        auth.switchUserRole(val);
-                      }
-                    },
-                  ),
+                8.verticalSpace,
+                Row(
+                  children: [
+                    _buildRoleChip('Owner', AppConstants.roleOwner, user?.role == AppConstants.roleOwner, () {
+                      auth.switchUserRole(AppConstants.roleOwner);
+                    }),
+                    8.horizontalSpace,
+                    _buildRoleChip('Manager', AppConstants.roleManager, user?.role == AppConstants.roleManager, () {
+                      auth.switchUserRole(AppConstants.roleManager);
+                    }),
+                    8.horizontalSpace,
+                    _buildRoleChip('Staff', AppConstants.roleStaff, user?.role == AppConstants.roleStaff, () {
+                      auth.switchUserRole(AppConstants.roleStaff);
+                    }),
+                  ],
                 ),
               ],
             ),
@@ -184,6 +262,34 @@ class SettingsScreen extends StatelessWidget {
         ),
       );
     });
+  }
+
+  Widget _buildRoleChip(String label, String roleValue, bool isSelected, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: 8.h),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(10.r),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.primary.withValues(alpha: 0.3),
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.sp,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+              color: isSelected ? Colors.white : AppColors.primary,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   // --- 2. 3-Tier Theme Selector ---
@@ -344,8 +450,8 @@ class SettingsScreen extends StatelessWidget {
     });
   }
 
-  // --- 4. Admin Menu (RBAC, Backup, Activity Logs) ---
-  Widget _buildAdminMenu(BuildContext context, SettingsController controller, ThemeLanguageService themeService) {
+  // --- 4. Owner & Manager Governance Hub ---
+  Widget _buildOwnerGovernanceMenu(BuildContext context, PermissionService perm, ThemeLanguageService themeService) {
     return Container(
       decoration: BoxDecoration(
         color: themeService.cardColor,
@@ -354,14 +460,90 @@ class SettingsScreen extends StatelessWidget {
       child: Column(
         children: [
           _buildMenuItem(
-            icon: Icons.manage_accounts_rounded,
-            title: 'user_management'.tr,
-            subtitle: 'Manage roles and approve new devices',
+            icon: Icons.gavel_rounded,
+            title: 'Policy & Price Floor Controls',
+            subtitle: 'Minimum price %, max sales limits, exchange floor',
             iconColor: AppColors.primary,
             themeService: themeService,
-            onTap: () => context.push(AppRoute.userManagementScreen),
+            onTap: () => context.push(AppRoute.policyControlScreen),
           ),
           Divider(height: 1, color: themeService.inputBorderColor),
+          _buildMenuItem(
+            icon: Icons.local_offer_rounded,
+            title: 'Discount Rules & Approvals',
+            subtitle: 'Manager requests & Owner approval workflow',
+            iconColor: const Color(0xFF8B5CF6),
+            themeService: themeService,
+            onTap: () => context.push(AppRoute.discountManagementScreen),
+          ),
+          Divider(height: 1, color: themeService.inputBorderColor),
+          _buildMenuItem(
+            icon: Icons.local_shipping_rounded,
+            title: 'Supplier & Vendor Directory',
+            subtitle: 'Manage supplier contacts and order histories',
+            iconColor: AppColors.secondary,
+            themeService: themeService,
+            onTap: () => context.push(AppRoute.supplierManagementScreen),
+          ),
+          if (perm.isOwner) ...[
+            Divider(height: 1, color: themeService.inputBorderColor),
+            _buildMenuItem(
+              icon: Icons.pie_chart_rounded,
+              title: 'Investor Management',
+              subtitle: 'Cap table, equity, profit distributions',
+              iconColor: const Color(0xFFF59E0B),
+              themeService: themeService,
+              onTap: () => context.push(AppRoute.investorManagementScreen),
+            ),
+            Divider(height: 1, color: themeService.inputBorderColor),
+            _buildMenuItem(
+              icon: Icons.account_balance_rounded,
+              title: 'Borrowed Loans (Liabilities)',
+              subtitle: 'Principal repayment & interest expense',
+              iconColor: const Color(0xFFEF4444),
+              themeService: themeService,
+              onTap: () => context.push(AppRoute.loanManagementScreen),
+            ),
+            Divider(height: 1, color: themeService.inputBorderColor),
+            _buildMenuItem(
+              icon: Icons.handshake_rounded,
+              title: 'Money Lent (Receivables)',
+              subtitle: 'Debtor tracking & interest earnings',
+              iconColor: const Color(0xFF10B981),
+              themeService: themeService,
+              onTap: () => context.push(AppRoute.moneyLentScreen),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // --- 5. Admin Menu (RBAC, Backup, Activity Logs) ---
+  Widget _buildAdminMenu(
+    BuildContext context,
+    SettingsController controller,
+    PermissionService perm,
+    ThemeLanguageService themeService,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        color: themeService.cardColor,
+        borderRadius: BorderRadius.circular(16.r),
+      ),
+      child: Column(
+        children: [
+          if (perm.isOwner) ...[
+            _buildMenuItem(
+              icon: Icons.manage_accounts_rounded,
+              title: 'user_management'.tr,
+              subtitle: 'Manage roles and approve new devices',
+              iconColor: AppColors.primary,
+              themeService: themeService,
+              onTap: () => context.push(AppRoute.userManagementScreen),
+            ),
+            Divider(height: 1, color: themeService.inputBorderColor),
+          ],
           _buildMenuItem(
             icon: Icons.cloud_download_rounded,
             title: 'cloud_backup_restore'.tr,
@@ -374,7 +556,7 @@ class SettingsScreen extends StatelessWidget {
           _buildMenuItem(
             icon: Icons.history_edu_rounded,
             title: 'activity_logs'.tr,
-            subtitle: 'Complete chronological audit trail',
+            subtitle: 'Complete chronological 6-month audit trail',
             iconColor: AppColors.warning,
             themeService: themeService,
             onTap: () => context.push(AppRoute.activityLogsScreen),

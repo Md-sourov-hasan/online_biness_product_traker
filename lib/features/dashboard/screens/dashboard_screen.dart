@@ -6,6 +6,7 @@ import '../controllers/dashboard_controller.dart';
 import '../../bottom_navigation/controllers/bottom_navigation_controller.dart';
 import '../../../core/services/database_service.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/services/permission_service.dart';
 import '../../../core/services/theme_language_service.dart';
 import '../../../core/utils/sizer.dart';
 import '../../../core/utils/constants/colors.dart';
@@ -21,6 +22,7 @@ class DashboardScreen extends StatelessWidget {
     final DashboardController controller = Get.put(DashboardController());
     final DatabaseService db = Get.find<DatabaseService>();
     final AuthService auth = Get.find<AuthService>();
+    final PermissionService perm = Get.find<PermissionService>();
     final ThemeLanguageService themeService = Get.find<ThemeLanguageService>();
     final BottomNavigationController nav = Get.find<BottomNavigationController>();
 
@@ -28,81 +30,444 @@ class DashboardScreen extends StatelessWidget {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header with Store / User Info & Cloud Sync Indicator
-              _buildHeader(context, auth, db, themeService),
-              20.verticalSpace,
-
-              // 1. Product Quantity & Valuation Card
-              _buildProductQuantityCard(db, themeService, nav),
-              16.verticalSpace,
-
-              // 2. 5-Second Rotating Sales & Profit Cards (Side by Side)
-              Row(
-                children: [
-                  Expanded(
-                    child: Obx(() => _buildRotatingMetricCard(
-                          title: controller.currentSalesLabelKey.tr,
-                          value: '৳${controller.currentPeriodSales.toStringAsFixed(0)}',
-                          subtitle: 'Tap to cycle',
-                          icon: Icons.trending_up_rounded,
-                          accentColor: AppColors.primary,
-                          onTap: controller.cycleSalesRotation,
-                          themeService: themeService,
-                          tag: controller.currentSalesPeriod.toUpperCase(),
-                        )),
-                  ),
-                  12.horizontalSpace,
-                  Expanded(
-                    child: Obx(() => _buildRotatingMetricCard(
-                          title: controller.currentProfitLabelKey.tr,
-                          value: '৳${controller.currentPeriodProfit.toStringAsFixed(0)}',
-                          subtitle: 'Tap to cycle',
-                          icon: Icons.auto_graph_rounded,
-                          accentColor: AppColors.secondary,
-                          onTap: controller.cycleProfitRotation,
-                          themeService: themeService,
-                          tag: controller.currentProfitPeriod.toUpperCase(),
-                        )),
-                  ),
-                ],
-              ),
-              16.verticalSpace,
-
-              // 3. Financial Balance Summary (Revenue, Expense, Net Profit)
-              _buildFinancialSummaryRow(db, themeService),
-              24.verticalSpace,
-
-              // 4. Quick Action Buttons
-              Text(
-                'quick_actions'.tr,
-                style: getTextStyle(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.w700,
-                  color: themeService.textColor,
-                ),
-              ),
-              14.verticalSpace,
-              _buildQuickActionsGrid(context, nav, themeService),
-              24.verticalSpace,
-
-              // 5. Active Low Stock Alerts Section
-              _buildLowStockSection(db, context, themeService),
-              24.verticalSpace,
-
-              // 6. Recent Activity Timeline
-              _buildRecentActivitySection(db, themeService),
-              80.verticalSpace, // Spacing for bottom navbar
-            ],
-          ),
+          child: Obx(() {
+            if (perm.isStaff) {
+              return _buildStaffDashboard(context, auth, db, themeService, nav);
+            } else if (perm.isManager) {
+              return _buildManagerDashboard(context, auth, db, controller, themeService, nav);
+            } else {
+              return _buildOwnerDashboard(context, auth, db, controller, themeService, nav);
+            }
+          }),
         ),
       ),
     );
   }
 
-  // --- 1. Header Section with Cloud Sync Indicator ---
+  // ===========================================================================
+  // 1. STAFF DASHBOARD (Spec Section 6.1: Intentionally Minimal & Privacy-First)
+  // ===========================================================================
+  Widget _buildStaffDashboard(
+    BuildContext context,
+    AuthService auth,
+    DatabaseService db,
+    ThemeLanguageService themeService,
+    BottomNavigationController nav,
+  ) {
+    final userName = auth.currentUser.value?.name ?? 'Staff';
+    final userExpenses = db.getExpensesForUser(auth.currentUser.value!);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildHeader(context, auth, db, themeService),
+        20.verticalSpace,
+
+        // Staff Welcome Card
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(16.w),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16.r),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0F766E).withValues(alpha: 0.25),
+                blurRadius: 12,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    child: Text(
+                      'SALES & DISPATCH TERMINAL',
+                      style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w700, color: Colors.white),
+                    ),
+                  ),
+                  Icon(Icons.point_of_sale_rounded, color: Colors.white, size: 24.w),
+                ],
+              ),
+              12.verticalSpace,
+              Text(
+                'Welcome, $userName',
+                style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: Colors.white),
+              ),
+              4.verticalSpace,
+              Text(
+                'Ready to process customer sales and record delivery expenses.',
+                style: TextStyle(fontSize: 12.sp, color: Colors.white.withValues(alpha: 0.9)),
+              ),
+            ],
+          ),
+        ),
+        20.verticalSpace,
+
+        // Quick Task Buttons for Staff
+        Text(
+          'Quick Tasks',
+          style: getTextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
+        ),
+        12.verticalSpace,
+        Row(
+          children: [
+            Expanded(
+              child: _buildStaffActionCard(
+                title: 'New Sale (POS)',
+                subtitle: 'Process order',
+                icon: Icons.point_of_sale_rounded,
+                color: AppColors.primary,
+                theme: themeService,
+                onTap: () => nav.changeTab(2),
+              ),
+            ),
+            12.horizontalSpace,
+            Expanded(
+              child: _buildStaffActionCard(
+                title: 'Check Stock & Price',
+                subtitle: 'View availability',
+                icon: Icons.search_rounded,
+                color: const Color(0xFF0F766E),
+                theme: themeService,
+                onTap: () => nav.changeTab(1),
+              ),
+            ),
+          ],
+        ),
+        12.verticalSpace,
+        Row(
+          children: [
+            Expanded(
+              child: _buildStaffActionCard(
+                title: 'Record Expense',
+                subtitle: 'Delivery / courier',
+                icon: Icons.receipt_long_rounded,
+                color: AppColors.error,
+                theme: themeService,
+                onTap: () => nav.changeTab(3),
+              ),
+            ),
+            12.horizontalSpace,
+            Expanded(
+              child: _buildStaffActionCard(
+                title: 'My Submissions',
+                subtitle: '${userExpenses.length} entries (30d)',
+                icon: Icons.history_rounded,
+                color: AppColors.secondary,
+                theme: themeService,
+                onTap: () => nav.changeTab(3),
+              ),
+            ),
+          ],
+        ),
+        24.verticalSpace,
+
+        // Available Products Quick Check (Price & Availability only - NO cost price!)
+        Text(
+          'Available Products & Customer Selling Prices',
+          style: getTextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
+        ),
+        10.verticalSpace,
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: db.products.take(6).length,
+          separatorBuilder: (context, index) => 8.verticalSpace,
+          itemBuilder: (context, index) {
+            final p = db.products[index];
+            final inStock = p.quantity > 0;
+            return Container(
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+              decoration: BoxDecoration(
+                color: themeService.cardColor,
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(color: themeService.inputBorderColor, width: 0.5),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(p.displayName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: themeService.textColor)),
+                        Text('Code: ${p.productCode} • ${inStock ? "${p.quantity} pcs available" : "Out of Stock"}',
+                            style: TextStyle(fontSize: 11.sp, color: inStock ? AppColors.success : Colors.redAccent)),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('৳${p.sellingPrice.toStringAsFixed(0)}',
+                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                      Text('Selling Price', style: TextStyle(fontSize: 9.sp, color: themeService.subtextColor)),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        80.verticalSpace,
+      ],
+    );
+  }
+
+  Widget _buildStaffActionCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required ThemeLanguageService theme,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.all(14.w),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(14.r),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 6, offset: const Offset(0, 3)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: EdgeInsets.all(8.w),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: Icon(icon, color: color, size: 22.w),
+            ),
+            10.verticalSpace,
+            Text(title, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: theme.textColor)),
+            2.verticalSpace,
+            Text(subtitle, style: TextStyle(fontSize: 11.sp, color: theme.subtextColor)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // 2. MANAGER DASHBOARD (Spec Section 5.4: Operational Metrics)
+  // ===========================================================================
+  Widget _buildManagerDashboard(
+    BuildContext context,
+    AuthService auth,
+    DatabaseService db,
+    DashboardController controller,
+    ThemeLanguageService themeService,
+    BottomNavigationController nav,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildHeader(context, auth, db, themeService),
+        20.verticalSpace,
+
+        // Operational Stock Units Card (No Total Valuation exposed to Manager)
+        Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(16.w),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('OPERATIONAL INVENTORY', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.9))),
+                  Icon(Icons.inventory_2_rounded, color: Colors.white, size: 20.w),
+                ],
+              ),
+              10.verticalSpace,
+              Text('${db.totalStockPieces} Units in Stock', style: TextStyle(fontSize: 22.sp, fontWeight: FontWeight.w800, color: Colors.white)),
+              4.verticalSpace,
+              Text('Across ${db.products.length} distinct SKUs & ${db.allBrands.length} brands',
+                  style: TextStyle(fontSize: 12.sp, color: Colors.white.withValues(alpha: 0.85))),
+            ],
+          ),
+        ),
+        16.verticalSpace,
+
+        // Rotating Sales Units & Expenses
+        Row(
+          children: [
+            Expanded(
+              child: Obx(() => _buildRotatingMetricCard(
+                    title: controller.currentSalesLabelKey.tr,
+                    value: '৳${controller.currentPeriodSales.toStringAsFixed(0)}',
+                    subtitle: 'Operational Sales',
+                    icon: Icons.trending_up_rounded,
+                    accentColor: AppColors.primary,
+                    onTap: controller.cycleSalesRotation,
+                    themeService: themeService,
+                    tag: controller.currentSalesPeriod.toUpperCase(),
+                  )),
+            ),
+            12.horizontalSpace,
+            Expanded(
+              child: Container(
+                padding: EdgeInsets.all(14.w),
+                decoration: BoxDecoration(
+                  color: themeService.cardColor,
+                  borderRadius: BorderRadius.circular(16.r),
+                  border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.receipt_long_rounded, color: AppColors.error, size: 22.w),
+                    12.verticalSpace,
+                    Text('Total Expenses', style: TextStyle(fontSize: 11.sp, color: themeService.subtextColor)),
+                    4.verticalSpace,
+                    Text('৳${db.totalExpenses.toStringAsFixed(0)}',
+                        style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: themeService.textColor)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        24.verticalSpace,
+
+        // Quick Actions for Manager
+        Text('Manager Quick Actions', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: themeService.textColor)),
+        12.verticalSpace,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(child: _buildActionItem('New Sale', Icons.point_of_sale_rounded, AppColors.primary, () => nav.changeTab(2), themeService)),
+            Expanded(child: _buildActionItem('Restock', Icons.add_shopping_cart_rounded, AppColors.secondary, () => nav.changeTab(3), themeService)),
+            Expanded(child: _buildActionItem('Add SKU', Icons.add_box_rounded, AppColors.warning, () => context.push(AppRoute.addEditProductScreen), themeService)),
+            Expanded(child: _buildActionItem('Discounts', Icons.discount_rounded, const Color(0xFF8B5CF6), () => context.push(AppRoute.discountManagementScreen), themeService)),
+            Expanded(child: _buildActionItem('Suppliers', Icons.local_shipping_rounded, const Color(0xFF0F766E), () => context.push(AppRoute.supplierManagementScreen), themeService)),
+          ],
+        ),
+        24.verticalSpace,
+
+        _buildLowStockSection(db, context, themeService),
+        24.verticalSpace,
+        _buildRecentActivitySection(db, themeService),
+        80.verticalSpace,
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // 3. OWNER DASHBOARD (Spec Section 2.1 & 10: Complete Financial & Audit Access)
+  // ===========================================================================
+  Widget _buildOwnerDashboard(
+    BuildContext context,
+    AuthService auth,
+    DatabaseService db,
+    DashboardController controller,
+    ThemeLanguageService themeService,
+    BottomNavigationController nav,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildHeader(context, auth, db, themeService),
+        20.verticalSpace,
+
+        // 1. Product Quantity & Total Valuation Card
+        _buildProductQuantityCard(db, themeService, nav),
+        16.verticalSpace,
+
+        // 2. 5-Second Rotating Sales & Profit Cards (Side by Side)
+        Row(
+          children: [
+            Expanded(
+              child: Obx(() => _buildRotatingMetricCard(
+                    title: controller.currentSalesLabelKey.tr,
+                    value: '৳${controller.currentPeriodSales.toStringAsFixed(0)}',
+                    subtitle: 'Tap to cycle',
+                    icon: Icons.trending_up_rounded,
+                    accentColor: AppColors.primary,
+                    onTap: controller.cycleSalesRotation,
+                    themeService: themeService,
+                    tag: controller.currentSalesPeriod.toUpperCase(),
+                  )),
+            ),
+            12.horizontalSpace,
+            Expanded(
+              child: Obx(() => _buildRotatingMetricCard(
+                    title: controller.currentProfitLabelKey.tr,
+                    value: '৳${controller.currentPeriodProfit.toStringAsFixed(0)}',
+                    subtitle: 'Tap to cycle',
+                    icon: Icons.auto_graph_rounded,
+                    accentColor: AppColors.secondary,
+                    onTap: controller.cycleProfitRotation,
+                    themeService: themeService,
+                    tag: controller.currentProfitPeriod.toUpperCase(),
+                  )),
+            ),
+          ],
+        ),
+        16.verticalSpace,
+
+        // 3. Complete Financial & Accounting Breakdown (Spec Section 9)
+        _buildComprehensiveFinancialSummary(db, themeService),
+        20.verticalSpace,
+
+        // 4. Owner Capital, Debt & Receivables Hub (Spec Section 11, 12, 13)
+        _buildOwnerCapitalHub(context, db, themeService),
+        24.verticalSpace,
+
+        // 5. Quick Actions Grid
+        Text(
+          'quick_actions'.tr,
+          style: getTextStyle(
+            fontSize: 18.sp,
+            fontWeight: FontWeight.w700,
+            color: themeService.textColor,
+          ),
+        ),
+        14.verticalSpace,
+        _buildOwnerQuickActionsGrid(context, nav, themeService),
+        24.verticalSpace,
+
+        // 6. Active Low Stock Alerts Section
+        _buildLowStockSection(db, context, themeService),
+        24.verticalSpace,
+
+        // 7. Recent Activity Timeline (Complete Audit Trail)
+        _buildRecentActivitySection(db, themeService),
+        80.verticalSpace,
+      ],
+    );
+  }
+
+  // --- Header with Exact-Time Sync (Spec Section 10.2) ---
   Widget _buildHeader(
     BuildContext context,
     AuthService auth,
@@ -162,13 +527,17 @@ class DashboardScreen extends StatelessWidget {
           ),
         ),
         8.horizontalSpace,
-        // Cloud Sync Indicator Button
+        // Exact-Time Sync Button (Spec Section 10.2: Exact available data up to the second)
         Obx(() {
           final isSyncing = db.isSyncing.value;
+          final timeStr = DateFormat('hh:mm:ss a').format(db.lastSyncTime.value);
           return GestureDetector(
-            onTap: () => _showCloudSyncDialog(context, db, themeService),
+            onTap: () async {
+              await db.triggerCloudSync();
+              Get.snackbar('Authoritative State Synced', 'Data synchronized up to $timeStr', snackPosition: SnackPosition.BOTTOM);
+            },
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 5.h),
+              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
               decoration: BoxDecoration(
                 color: themeService.cardColor,
                 borderRadius: BorderRadius.circular(20.r),
@@ -186,15 +555,6 @@ class DashboardScreen extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 7.w,
-                    height: 7.w,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSyncing ? AppColors.warning : AppColors.secondary,
-                    ),
-                  ),
-                  4.horizontalSpace,
                   Icon(
                     isSyncing ? Icons.sync_rounded : Icons.cloud_done_rounded,
                     size: 14.w,
@@ -202,7 +562,7 @@ class DashboardScreen extends StatelessWidget {
                   ),
                   4.horizontalSpace,
                   Text(
-                    isSyncing ? 'Syncing...' : 'Synced',
+                    isSyncing ? 'Syncing...' : 'Sync ($timeStr)',
                     style: getTextStyle(
                       fontSize: 10.sp,
                       fontWeight: FontWeight.w600,
@@ -218,7 +578,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  // --- 2. Product Quantity & Valuation Summary Card ---
+  // --- Product Quantity & Valuation Card ---
   Widget _buildProductQuantityCard(
     DatabaseService db,
     ThemeLanguageService themeService,
@@ -300,7 +660,8 @@ class DashboardScreen extends StatelessWidget {
                             color: Colors.white,
                           ),
                         ),
-                        Icon(Icons.chevron_right, color: Colors.white, size: 14.w),
+                        4.horizontalSpace,
+                        Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 10.w),
                       ],
                     ),
                   ),
@@ -309,47 +670,50 @@ class DashboardScreen extends StatelessWidget {
             ),
             14.verticalSpace,
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$totalPieces pcs',
-                        style: getTextStyle(
-                          fontSize: 24.sp,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                      4.verticalSpace,
-                      Text(
-                        '${'stock_valuation'.tr}: ৳${totalValuation.toStringAsFixed(0)}',
-                        style: getTextStyle(
-                          fontSize: 12.sp,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white.withValues(alpha: 0.85),
-                        ),
-                      ),
-                    ],
+                Text(
+                  '$totalPieces',
+                  style: getTextStyle(
+                    fontSize: 28.sp,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
                   ),
                 ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(10.r),
+                6.horizontalSpace,
+                Text(
+                  'units_in_stock'.tr,
+                  style: getTextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
-                  child: Text(
-                    '$catalogCount Items • $brandCount Brands',
-                    style: getTextStyle(
-                      fontSize: 11.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: 0.9),
-                    ),
-                  ),
+                ),
+              ],
+            ),
+            8.verticalSpace,
+            Text(
+              '${'total_valuation'.tr}: ৳${totalValuation.toStringAsFixed(0)}',
+              style: getTextStyle(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFFFACC15),
+              ),
+            ),
+            12.verticalSpace,
+            Container(height: 1, color: Colors.white.withValues(alpha: 0.15)),
+            10.verticalSpace,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'SKUs: $catalogCount',
+                  style: getTextStyle(fontSize: 11.sp, color: Colors.white.withValues(alpha: 0.9)),
+                ),
+                Text(
+                  'Brands: $brandCount',
+                  style: getTextStyle(fontSize: 11.sp, color: Colors.white.withValues(alpha: 0.9)),
                 ),
               ],
             ),
@@ -359,7 +723,7 @@ class DashboardScreen extends StatelessWidget {
     });
   }
 
-  // --- 3. Rotating Metric Card (Auto-rotates every 5s) ---
+  // --- Rotating Metric Card ---
   Widget _buildRotatingMetricCard({
     required String title,
     required String value,
@@ -440,32 +804,23 @@ class DashboardScreen extends StatelessWidget {
                 color: themeService.textColor,
               ),
             ),
-            4.verticalSpace,
-            Row(
-              children: [
-                Icon(Icons.refresh_rounded, size: 10.w, color: themeService.subtextColor),
-                4.horizontalSpace,
-                Text(
-                  'Auto 5s',
-                  style: getTextStyle(
-                    fontSize: 9.sp,
-                    fontWeight: FontWeight.w400,
-                    color: themeService.subtextColor,
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
     );
   }
 
-  // --- 4. Financial Balance Summary (Revenue, Expense, Net Profit) ---
-  Widget _buildFinancialSummaryRow(DatabaseService db, ThemeLanguageService themeService) {
+  // --- Comprehensive Accounting Engine Summary (Spec Section 9) ---
+  Widget _buildComprehensiveFinancialSummary(DatabaseService db, ThemeLanguageService themeService) {
     return Obx(() {
-      final revenue = db.totalRevenue;
+      final grossSales = db.totalGrossSales;
+      final discounts = db.totalAuthorizedDiscounts;
+      final refunds = db.totalRefunds;
+      final netSales = db.totalRevenue;
+      final cogs = db.totalCOGS;
+      final grossProfit = db.totalGrossProfit;
       final expenses = db.totalExpenses;
+      final loanInterest = db.totalLoanInterestExpenses;
       final netProfit = db.netProfit;
 
       return Container(
@@ -473,42 +828,42 @@ class DashboardScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: themeService.cardColor,
           borderRadius: BorderRadius.circular(16.r),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          border: Border.all(color: themeService.inputBorderColor, width: 0.5),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: _buildFinancialItem(
-                'total_revenue'.tr,
-                '৳${revenue.toStringAsFixed(0)}',
-                AppColors.primary,
-                themeService,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Financial Engine & Accounting Summary',
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: themeService.textColor)),
+                Text('Spec Section 9', style: TextStyle(fontSize: 10.sp, color: AppColors.primary, fontWeight: FontWeight.w600)),
+              ],
             ),
-            Container(width: 1, height: 36.h, color: themeService.inputBorderColor),
-            Expanded(
-              child: _buildFinancialItem(
-                'total_expenses'.tr,
-                '৳${expenses.toStringAsFixed(0)}',
-                AppColors.error,
-                themeService,
-              ),
+            12.verticalSpace,
+            Row(
+              children: [
+                Expanded(child: _buildFinancialItem('Net Revenue', '৳${netSales.toStringAsFixed(0)}', AppColors.primary, themeService)),
+                Container(width: 1, height: 35.h, color: themeService.inputBorderColor),
+                Expanded(child: _buildFinancialItem('COGS', '৳${cogs.toStringAsFixed(0)}', Colors.orange, themeService)),
+                Container(width: 1, height: 35.h, color: themeService.inputBorderColor),
+                Expanded(child: _buildFinancialItem('Gross Profit', '৳${grossProfit.toStringAsFixed(0)}', AppColors.secondary, themeService, isBold: true)),
+                Container(width: 1, height: 35.h, color: themeService.inputBorderColor),
+                Expanded(child: _buildFinancialItem('Net Profit', '৳${netProfit.toStringAsFixed(0)}', netProfit >= 0 ? AppColors.success : AppColors.error, themeService, isBold: true)),
+              ],
             ),
-            Container(width: 1, height: 36.h, color: themeService.inputBorderColor),
-            Expanded(
-              child: _buildFinancialItem(
-                'net_profit'.tr,
-                '৳${netProfit.toStringAsFixed(0)}',
-                netProfit >= 0 ? AppColors.secondary : AppColors.error,
-                themeService,
-                isBold: true,
-              ),
+            10.verticalSpace,
+            Container(height: 1, color: themeService.inputBorderColor.withValues(alpha: 0.5)),
+            8.verticalSpace,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Gross: ৳${grossSales.toStringAsFixed(0)}  •  Discounts: -৳${discounts.toStringAsFixed(0)}  •  OpEx: -৳${expenses.toStringAsFixed(0)}  •  Refunds: -৳${refunds.toStringAsFixed(0)}',
+                    style: TextStyle(fontSize: 10.sp, color: themeService.subtextColor)),
+                if (loanInterest > 0)
+                  Text('Loan Interest: -৳${loanInterest.toStringAsFixed(0)}', style: TextStyle(fontSize: 10.sp, color: Colors.redAccent)),
+              ],
             ),
           ],
         ),
@@ -541,7 +896,7 @@ class DashboardScreen extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: getTextStyle(
-            fontSize: 14.sp,
+            fontSize: 13.sp,
             fontWeight: isBold ? FontWeight.w800 : FontWeight.w700,
             color: color,
           ),
@@ -550,50 +905,139 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  // --- 5. Quick Actions Grid ---
-  Widget _buildQuickActionsGrid(
+  // --- Owner Capital & Liabilities Hub (Spec Section 11, 12, 13) ---
+  Widget _buildOwnerCapitalHub(BuildContext context, DatabaseService db, ThemeLanguageService theme) {
+    return Obx(() {
+      final investors = db.investors;
+      final totalActiveCapital = investors.fold(0.0, (sum, i) => sum + db.getNetActiveCapitalForInvestor(i.id));
+
+      final loans = db.loans;
+      final totalDebt = loans.fold(0.0, (sum, l) => sum + db.getOutstandingLoanPrincipal(l.id));
+
+      final recs = db.receivables;
+      final totalReceivables = recs.fold(0.0, (sum, r) => sum + db.getOutstandingReceivablePrincipal(r.id));
+
+      return Container(
+        padding: EdgeInsets.all(14.w),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Owner Capital, Loans & Receivables',
+                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: theme.textColor)),
+                Text('Exclusive Hub', style: TextStyle(fontSize: 10.sp, color: AppColors.primary, fontWeight: FontWeight.w700)),
+              ],
+            ),
+            12.verticalSpace,
+            Row(
+              children: [
+                // Investors
+                Expanded(
+                  child: _buildOwnerHubTile(
+                    title: 'Active Investors',
+                    value: '৳${totalActiveCapital.toStringAsFixed(0)}',
+                    subtitle: '${investors.length} Partners',
+                    color: AppColors.primary,
+                    theme: theme,
+                    onTap: () => context.push(AppRoute.investorManagementScreen),
+                  ),
+                ),
+                8.horizontalSpace,
+                // Loans
+                Expanded(
+                  child: _buildOwnerHubTile(
+                    title: 'Loan Debt',
+                    value: '৳${totalDebt.toStringAsFixed(0)}',
+                    subtitle: '${loans.length} Borrowed',
+                    color: Colors.redAccent,
+                    theme: theme,
+                    onTap: () => context.push(AppRoute.loanManagementScreen),
+                  ),
+                ),
+                8.horizontalSpace,
+                // Money Lent
+                Expanded(
+                  child: _buildOwnerHubTile(
+                    title: 'Money Lent',
+                    value: '৳${totalReceivables.toStringAsFixed(0)}',
+                    subtitle: '${recs.length} Receivables',
+                    color: AppColors.secondary,
+                    theme: theme,
+                    onTap: () => context.push(AppRoute.moneyLentScreen),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildOwnerHubTile({
+    required String title,
+    required String value,
+    required String subtitle,
+    required Color color,
+    required ThemeLanguageService theme,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.all(10.w),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: color)),
+            4.verticalSpace,
+            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: theme.textColor)),
+            2.verticalSpace,
+            Text(subtitle, style: TextStyle(fontSize: 9.sp, color: theme.subtextColor)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- Owner Quick Actions Grid ---
+  Widget _buildOwnerQuickActionsGrid(
     BuildContext context,
     BottomNavigationController nav,
     ThemeLanguageService themeService,
   ) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
       children: [
-        Expanded(
-          child: _buildActionItem(
-            'action_new_sale'.tr,
-            Icons.point_of_sale_rounded,
-            AppColors.primary,
-            () => nav.changeTab(2), // Switch to Sales POS tab
-            themeService,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(child: _buildActionItem('action_new_sale'.tr, Icons.point_of_sale_rounded, AppColors.primary, () => nav.changeTab(2), themeService)),
+            Expanded(child: _buildActionItem('action_purchase'.tr, Icons.add_shopping_cart_rounded, AppColors.secondary, () => nav.changeTab(3), themeService)),
+            Expanded(child: _buildActionItem('action_add_product'.tr, Icons.add_box_rounded, AppColors.warning, () => context.push(AppRoute.addEditProductScreen), themeService)),
+            Expanded(child: _buildActionItem('action_reports'.tr, Icons.pie_chart_rounded, const Color(0xFF8B5CF6), () => nav.changeTab(4), themeService)),
+          ],
         ),
-        Expanded(
-          child: _buildActionItem(
-            'action_purchase'.tr,
-            Icons.add_shopping_cart_rounded,
-            AppColors.secondary,
-            () => nav.changeTab(3), // Switch to Purchase/Expense tab
-            themeService,
-          ),
-        ),
-        Expanded(
-          child: _buildActionItem(
-            'action_add_product'.tr,
-            Icons.add_box_rounded,
-            AppColors.warning,
-            () => context.push(AppRoute.addEditProductScreen),
-            themeService,
-          ),
-        ),
-        Expanded(
-          child: _buildActionItem(
-            'action_reports'.tr,
-            Icons.pie_chart_rounded,
-            const Color(0xFF8B5CF6),
-            () => nav.changeTab(4), // Reports
-            themeService,
-          ),
+        12.verticalSpace,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(child: _buildActionItem('Policies', Icons.shield_rounded, AppColors.primary, () => context.push(AppRoute.policyControlScreen), themeService)),
+            Expanded(child: _buildActionItem('Discounts', Icons.discount_rounded, const Color(0xFFE11D48), () => context.push(AppRoute.discountManagementScreen), themeService)),
+            Expanded(child: _buildActionItem('Suppliers', Icons.local_shipping_rounded, const Color(0xFF0F766E), () => context.push(AppRoute.supplierManagementScreen), themeService)),
+            Expanded(child: _buildActionItem('Audit Logs', Icons.history_edu_rounded, const Color(0xFF64748B), () => context.push(AppRoute.activityLogsScreen), themeService)),
+          ],
         ),
       ],
     );
@@ -641,7 +1085,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  // --- 6. Low Stock Alert Section ---
+  // --- Low Stock Alert Section ---
   Widget _buildLowStockSection(
     DatabaseService db,
     BuildContext context,
@@ -653,83 +1097,61 @@ class DashboardScreen extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(
-              child: Row(
-                children: [
-                  Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 20.w),
-                  6.horizontalSpace,
-                  Expanded(
-                    child: Text(
-                      'low_stock_alerts'.tr,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: getTextStyle(
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w700,
-                        color: themeService.textColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 20.w),
+                6.horizontalSpace,
+                Text(
+                  'low_stock_alerts'.tr,
+                  style: getTextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
+                ),
+              ],
             ),
             Obx(() => Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                   decoration: BoxDecoration(
-                    color: db.lowStockProducts.isNotEmpty
-                        ? AppColors.error.withValues(alpha: 0.12)
-                        : AppColors.secondary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10.r),
+                    color: AppColors.error.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8.r),
                   ),
                   child: Text(
                     '${db.lowStockProducts.length} Items',
-                    style: getTextStyle(
-                      fontSize: 11.sp,
-                      fontWeight: FontWeight.w700,
-                      color: db.lowStockProducts.isNotEmpty ? AppColors.error : AppColors.secondary,
-                    ),
+                    style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: AppColors.error),
                   ),
                 )),
           ],
         ),
-        12.verticalSpace,
+        10.verticalSpace,
         Obx(() {
-          final lowStockList = db.lowStockProducts;
-          if (lowStockList.isEmpty) {
+          final lowStock = db.lowStockProducts;
+          if (lowStock.isEmpty) {
             return Container(
-              padding: EdgeInsets.all(16.w),
+              padding: EdgeInsets.all(14.w),
               decoration: BoxDecoration(
                 color: themeService.cardColor,
-                borderRadius: BorderRadius.circular(14.r),
+                borderRadius: BorderRadius.circular(12.r),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle_outline_rounded, color: AppColors.secondary, size: 22.w),
-                  12.horizontalSpace,
-                  Expanded(
-                    child: Text(
-                      'all_stocked'.tr,
-                      style: getTextStyle(
-                        fontSize: 13.sp,
-                        fontWeight: FontWeight.w500,
-                        color: themeService.subtextColor,
-                      ),
-                    ),
-                  ),
+                  Icon(Icons.check_circle_outline_rounded, color: AppColors.secondary, size: 20.w),
+                  8.horizontalSpace,
+                  Text('All inventory levels are healthy.', style: TextStyle(color: themeService.subtextColor, fontSize: 13.sp)),
                 ],
               ),
             );
           }
-
-          return Column(
-            children: lowStockList.take(3).map((p) {
+          return ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: lowStock.length,
+            separatorBuilder: (context, index) => 8.verticalSpace,
+            itemBuilder: (context, index) {
+              final p = lowStock[index];
               return Container(
-                margin: EdgeInsets.only(bottom: 10.h),
-                padding: EdgeInsets.all(14.w),
+                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
                 decoration: BoxDecoration(
-                  color: AppColors.error.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(14.r),
-                  border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
+                  color: themeService.cardColor,
+                  borderRadius: BorderRadius.circular(12.r),
+                  border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -738,182 +1160,69 @@ class DashboardScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            p.displayName,
-                            style: getTextStyle(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w600,
-                              color: themeService.textColor,
-                            ),
-                          ),
-                          2.verticalSpace,
-                          Text(
-                            'Code: ${p.productCode} • Cost: ৳${p.pricePerPiece.toStringAsFixed(0)}',
-                            style: getTextStyle(
-                              fontSize: 11.sp,
-                              fontWeight: FontWeight.w400,
-                              color: themeService.subtextColor,
-                            ),
-                          ),
+                          Text(p.displayName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: themeService.textColor)),
+                          Text('Code: ${p.productCode} • Threshold: ${p.lowStockThreshold} pcs',
+                              style: TextStyle(fontSize: 11.sp, color: themeService.subtextColor)),
                         ],
                       ),
                     ),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                      decoration: BoxDecoration(
-                        color: AppColors.error,
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                      child: Text(
-                        '${p.quantity} ${'items_left'.tr}',
-                        style: getTextStyle(
-                          fontSize: 11.sp,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+                    Text('${p.quantity} pcs left',
+                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: AppColors.error)),
                   ],
                 ),
               );
-            }).toList(),
+            },
           );
         }),
       ],
     );
   }
 
-  // --- 7. Recent Activity Timeline ---
+  // --- Recent Activity Section ---
   Widget _buildRecentActivitySection(DatabaseService db, ThemeLanguageService themeService) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'recent_activity'.tr,
-              style: getTextStyle(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w700,
-                color: themeService.textColor,
-              ),
-            ),
-            Icon(Icons.history_rounded, size: 20.w, color: themeService.subtextColor),
-          ],
-        ),
+        Text('recent_activities'.tr, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: themeService.textColor)),
         12.verticalSpace,
         Obx(() {
-          final logs = db.activityLogs;
+          final logs = db.activityLogs.take(5).toList();
           if (logs.isEmpty) {
-            return Container(
-              padding: EdgeInsets.all(16.w),
-              decoration: BoxDecoration(
-                color: themeService.cardColor,
-                borderRadius: BorderRadius.circular(14.r),
-              ),
-              child: Center(
-                child: Text(
-                  'No recent activity recorded yet.',
-                  style: getTextStyle(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.w400,
-                    color: themeService.subtextColor,
-                  ),
-                ),
-              ),
-            );
+            return Text('No recent activities.', style: TextStyle(color: themeService.subtextColor));
           }
-
           return Container(
-            padding: EdgeInsets.all(14.w),
+            padding: EdgeInsets.all(12.w),
             decoration: BoxDecoration(
               color: themeService.cardColor,
-              borderRadius: BorderRadius.circular(16.r),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              borderRadius: BorderRadius.circular(14.r),
+              border: Border.all(color: themeService.inputBorderColor, width: 0.5),
             ),
             child: ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: logs.take(5).length,
-              separatorBuilder: (context, i) => Divider(height: 20.h, color: themeService.inputBorderColor),
+              itemCount: logs.length,
+              separatorBuilder: (context, index) => const Divider(height: 16),
               itemBuilder: (context, index) {
                 final log = logs[index];
-                IconData icon;
-                Color iconColor;
-
-                switch (log.type) {
-                  case 'sale':
-                    icon = Icons.shopping_bag_rounded;
-                    iconColor = AppColors.secondary;
-                    break;
-                  case 'purchase':
-                    icon = Icons.add_business_rounded;
-                    iconColor = AppColors.primary;
-                    break;
-                  case 'expense':
-                    icon = Icons.receipt_rounded;
-                    iconColor = AppColors.error;
-                    break;
-                  default:
-                    icon = Icons.tune_rounded;
-                    iconColor = AppColors.warning;
-                }
-
-                final timeStr = DateFormat('hh:mm a • dd MMM').format(log.timestamp);
-
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: EdgeInsets.all(8.w),
+                      padding: EdgeInsets.all(6.w),
                       decoration: BoxDecoration(
-                        color: iconColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10.r),
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8.r),
                       ),
-                      child: Icon(icon, color: iconColor, size: 16.w),
+                      child: Icon(Icons.bolt_rounded, color: AppColors.primary, size: 16.w),
                     ),
-                    12.horizontalSpace,
+                    10.horizontalSpace,
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                log.title,
-                                style: getTextStyle(
-                                  fontSize: 13.sp,
-                                  fontWeight: FontWeight.w600,
-                                  color: themeService.textColor,
-                                ),
-                              ),
-                              Text(
-                                timeStr,
-                                style: getTextStyle(
-                                  fontSize: 10.sp,
-                                  fontWeight: FontWeight.w400,
-                                  color: themeService.subtextColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                          4.verticalSpace,
-                          Text(
-                            log.description,
-                            style: getTextStyle(
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w400,
-                              color: themeService.subtextColor,
-                            ),
-                          ),
+                          Text(log.title, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: themeService.textColor)),
+                          2.verticalSpace,
+                          Text(log.description, style: TextStyle(fontSize: 11.sp, color: themeService.subtextColor)),
                         ],
                       ),
                     ),
@@ -924,60 +1233,6 @@ class DashboardScreen extends StatelessWidget {
           );
         }),
       ],
-    );
-  }
-
-  // --- Cloud Sync Modal Dialog ---
-  void _showCloudSyncDialog(BuildContext context, DatabaseService db, ThemeLanguageService themeService) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: themeService.cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
-        title: Row(
-          children: [
-            Icon(Icons.cloud_sync_rounded, color: AppColors.primary, size: 24.w),
-            8.horizontalSpace,
-            Text(
-              'cloud_sync_title'.tr,
-              style: getTextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'cloud_synced'.tr,
-              style: getTextStyle(fontSize: 13.sp, fontWeight: FontWeight.w400, color: themeService.subtextColor),
-            ),
-            12.verticalSpace,
-            Obx(() => Text(
-                  'Last Synced: ${DateFormat('dd MMM yyyy, hh:mm a').format(db.lastSyncTime.value)}',
-                  style: getTextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.secondary),
-                )),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('cancel'.tr, style: TextStyle(color: themeService.subtextColor)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-            ),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await db.triggerCloudSync();
-              Get.snackbar('Cloud Synced', 'All business data updated to cloud', snackPosition: SnackPosition.BOTTOM);
-            },
-            child: Text('sync_now'.tr, style: const TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
     );
   }
 }

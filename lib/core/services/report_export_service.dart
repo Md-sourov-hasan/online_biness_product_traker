@@ -113,17 +113,21 @@ class ReportExportService extends GetxService {
 
   Future<void> exportProfitLossReportPdf() async {
     final pdf = pw.Document();
+    final grossSales = db.totalGrossSales;
+    final discounts = db.totalAuthorizedDiscounts;
+    final refunds = db.totalRefunds;
     final revenue = db.totalRevenue;
     final cogs = db.totalCOGS;
     final grossProfit = db.totalGrossProfit;
     final expenses = db.totalExpenses;
+    final loanInterest = db.totalLoanInterestExpenses;
     final netProfit = db.netProfit;
 
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        header: (context) => _buildPdfHeader('StockMate - Profit & Loss (P&L) Statement', 'Financial Summary'),
+        header: (context) => _buildPdfHeader('StockMate - Profit & Loss (P&L) Statement', 'Section 9 Accounting Standard'),
         footer: (context) => _buildPdfFooter(context),
         build: (context) => [
           pw.SizedBox(height: 16),
@@ -136,17 +140,25 @@ class ReportExportService extends GetxService {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                _buildPlRow('Total Sales Revenue', 'BDT ${revenue.toStringAsFixed(2)}', isBold: true),
+                _buildPlRow('Gross Sales', 'BDT ${grossSales.toStringAsFixed(2)}', isBold: true),
+                pw.Divider(),
+                _buildPlRow('Less: Authorized Discounts', '- BDT ${discounts.toStringAsFixed(2)}'),
+                pw.Divider(),
+                _buildPlRow('Less: Returns & Refunds', '- BDT ${refunds.toStringAsFixed(2)}'),
+                pw.Divider(),
+                _buildPlRow('Net Sales (Revenue)', 'BDT ${revenue.toStringAsFixed(2)}', isBold: true, color: PdfColors.blue800),
                 pw.Divider(),
                 _buildPlRow('Less: Cost of Goods Sold (COGS)', '- BDT ${cogs.toStringAsFixed(2)}'),
                 pw.Divider(),
-                _buildPlRow('Gross Profit', 'BDT ${grossProfit.toStringAsFixed(2)}', isBold: true, color: PdfColors.blue800),
+                _buildPlRow('Gross Profit', 'BDT ${grossProfit.toStringAsFixed(2)}', isBold: true, color: PdfColors.teal800),
                 pw.Divider(),
-                _buildPlRow('Less: Total Operating Expenses', '- BDT ${expenses.toStringAsFixed(2)}'),
+                _buildPlRow('Less: Operating Expenses', '- BDT ${expenses.toStringAsFixed(2)}'),
+                pw.Divider(),
+                _buildPlRow('Less: Loan Interest Expense', '- BDT ${loanInterest.toStringAsFixed(2)}'),
                 pw.Divider(),
                 pw.SizedBox(height: 8),
                 _buildPlRow(
-                  'NET PROFIT',
+                  'NET BUSINESS PROFIT / (LOSS)',
                   'BDT ${netProfit.toStringAsFixed(2)}',
                   isBold: true,
                   fontSize: 16,

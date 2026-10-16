@@ -6,7 +6,8 @@ class Product {
   final String catalogName;
   final String productCode;
   final int quantity;
-  final double pricePerPiece; // Cost price per unit
+  final double pricePerPiece; // Cost price per unit (Acquisition cost)
+  final double sellingPrice; // Customer-facing base price before discounts
   final double totalPrice; // Auto-calculated (quantity * pricePerPiece)
   final DateTime buyingDate;
   final String notes;
@@ -21,24 +22,36 @@ class Product {
     required this.productCode,
     required this.quantity,
     required this.pricePerPiece,
+    double? sellingPrice,
     double? totalPrice,
     DateTime? buyingDate,
     this.notes = '',
     this.lowStockThreshold = 3,
     this.imageUrl,
     DateTime? createdAt,
-  })  : totalPrice = totalPrice ?? (quantity * pricePerPiece),
+  })  : sellingPrice = sellingPrice ?? (pricePerPiece * 1.25),
+        totalPrice = totalPrice ?? (quantity * pricePerPiece),
         buyingDate = buyingDate ?? DateTime.now(),
         createdAt = createdAt ?? DateTime.now();
 
   String get displayName => '$brandName $catalogName'.trim();
 
-  // Backward compatibility getter for existing UI referencing .name & .costPrice
+  // Backward compatibility getters
   String get name => displayName;
   double get costPrice => pricePerPiece;
   int get stockQuantity => quantity;
   String get sku => productCode;
   String get category => brandName;
+
+  // Pricing Helpers per Spec Section 7.3
+  static double calculateSellingPriceWithMarkup(double cost, double markupPercentage) {
+    return cost * (1.0 + (markupPercentage / 100.0));
+  }
+
+  static double calculateSellingPriceWithMargin(double cost, double marginPercentage) {
+    if (marginPercentage >= 100.0) return cost;
+    return cost / (1.0 - (marginPercentage / 100.0));
+  }
 
   factory Product.fromMap(Map<String, dynamic> data, String documentId) {
     DateTime parseDate(dynamic val) {
@@ -50,6 +63,7 @@ class Product {
 
     final qty = (data['quantity'] ?? data['stockQuantity'] ?? 0) as int;
     final cost = (data['pricePerPiece'] ?? data['costPrice'] ?? 0.0).toDouble();
+    final sell = (data['sellingPrice'] ?? (cost * 1.25)).toDouble();
 
     return Product(
       id: documentId,
@@ -58,6 +72,7 @@ class Product {
       productCode: data['productCode'] ?? data['sku'] ?? '',
       quantity: qty,
       pricePerPiece: cost,
+      sellingPrice: sell > 0 ? sell : (cost * 1.25),
       totalPrice: (data['totalPrice'] ?? (qty * cost)).toDouble(),
       buyingDate: parseDate(data['buyingDate']),
       notes: data['notes'] ?? '',
@@ -75,6 +90,7 @@ class Product {
       'productCode': productCode,
       'quantity': quantity,
       'pricePerPiece': pricePerPiece,
+      'sellingPrice': sellingPrice,
       'totalPrice': totalPrice,
       'buyingDate': buyingDate.toIso8601String(),
       'notes': notes,
@@ -91,6 +107,7 @@ class Product {
     String? productCode,
     int? quantity,
     double? pricePerPiece,
+    double? sellingPrice,
     double? totalPrice,
     DateTime? buyingDate,
     String? notes,
@@ -100,6 +117,7 @@ class Product {
   }) {
     final updatedQty = quantity ?? this.quantity;
     final updatedCost = pricePerPiece ?? this.pricePerPiece;
+    final updatedSell = sellingPrice ?? this.sellingPrice;
     return Product(
       id: id ?? this.id,
       brandName: brandName ?? this.brandName,
@@ -107,6 +125,7 @@ class Product {
       productCode: productCode ?? this.productCode,
       quantity: updatedQty,
       pricePerPiece: updatedCost,
+      sellingPrice: updatedSell,
       totalPrice: totalPrice ?? (updatedQty * updatedCost),
       buyingDate: buyingDate ?? this.buyingDate,
       notes: notes ?? this.notes,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/services/theme_language_service.dart';
+import '../../../core/services/permission_service.dart';
 import '../../../core/utils/constants/colors.dart';
 import '../../../core/utils/sizer.dart';
 
@@ -17,8 +18,11 @@ class CustomBottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeLanguageService themeService = Get.find<ThemeLanguageService>();
+    final PermissionService perm = Get.find<PermissionService>();
 
     return Obx(() {
+      final isStaff = perm.isStaff;
+
       return Container(
         decoration: BoxDecoration(
           color: themeService.cardColor,
@@ -40,10 +44,25 @@ class CustomBottomNavBar extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 Expanded(child: _buildNavItem(0, Icons.dashboard_rounded, 'nav_dashboard'.tr, themeService)),
-                Expanded(child: _buildNavItem(1, Icons.inventory_2_rounded, 'nav_inventory'.tr, themeService)),
+                Expanded(
+                  child: _buildNavItem(
+                    1,
+                    Icons.inventory_2_rounded,
+                    isStaff ? 'Check Stock' : 'nav_inventory'.tr,
+                    themeService,
+                  ),
+                ),
                 Expanded(child: _buildNavItem(2, Icons.point_of_sale_rounded, 'nav_sales'.tr, themeService)),
-                Expanded(child: _buildNavItem(3, Icons.receipt_long_rounded, 'nav_purchases_expenses'.tr, themeService)),
-                Expanded(child: _buildNavItem(4, Icons.analytics_rounded, 'nav_reports'.tr, themeService)),
+                Expanded(
+                  child: _buildNavItem(
+                    3,
+                    Icons.receipt_long_rounded,
+                    isStaff ? 'My Expenses' : 'nav_purchases_expenses'.tr,
+                    themeService,
+                  ),
+                ),
+                if (!isStaff)
+                  Expanded(child: _buildNavItem(4, Icons.analytics_rounded, 'nav_reports'.tr, themeService)),
               ],
             ),
           ),
@@ -59,7 +78,7 @@ class CustomBottomNavBar extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
+        padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 6.h),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary.withValues(alpha: 0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(12.r),

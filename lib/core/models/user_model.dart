@@ -21,8 +21,8 @@ class AppUser {
 
   bool get isApproved => approvalStatus == 'approved';
   bool get isOwner => role.contains('Owner') || role.contains('Super Admin');
-  bool get isManager => role == 'Manager';
-  bool get isStaff => role == 'Staff';
+  bool get isManager => role.toLowerCase().contains('manager');
+  bool get isStaff => role.toLowerCase() == 'staff' || (!isOwner && !isManager);
 
   factory AppUser.fromMap(Map<String, dynamic> data, String documentId) {
     DateTime parseDate(dynamic val) {

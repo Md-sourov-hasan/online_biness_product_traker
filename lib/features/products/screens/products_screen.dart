@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import '../controllers/products_controller.dart';
+import '../../../core/services/permission_service.dart';
 import '../../../core/services/theme_language_service.dart';
 import '../../../core/utils/sizer.dart';
 import '../../../core/utils/constants/colors.dart';
 import '../../../core/common/styles/global_text_style.dart';
 import '../../../core/common/widgets/common_background.dart';
 import '../../../routes/app_routes.dart';
+import '../../bottom_navigation/controllers/bottom_navigation_controller.dart';
 
 class ProductsScreen extends StatelessWidget {
   const ProductsScreen({super.key});
@@ -16,6 +18,7 @@ class ProductsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final ProductsController controller = Get.put(ProductsController());
     final ThemeLanguageService themeService = Get.find<ThemeLanguageService>();
+    final PermissionService perm = Get.find<PermissionService>();
 
     return CommonBackgroundScaffold(
       appBar: AppBar(
@@ -29,18 +32,21 @@ class ProductsScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.add_circle_rounded, color: AppColors.primary, size: 28.w),
-            onPressed: () => context.push(AppRoute.addEditProductScreen),
-          ),
+          // Staff cannot add or mutate products directly
+          if (perm.canManageInventory)
+            IconButton(
+              icon: Icon(Icons.add_circle_rounded, color: AppColors.primary, size: 28.w),
+              tooltip: 'add_product'.tr,
+              onPressed: () => context.push(AppRoute.addEditProductScreen),
+            ),
           12.horizontalSpace,
         ],
         elevation: 0,
       ),
       body: Column(
         children: [
-          // 1. Stock Valuation Header Bar
-          _buildValuationHeader(controller, themeService),
+          // 1. Stock Header Bar (Role-Aware: Cost valuation strictly hidden from Staff)
+          _buildValuationHeader(controller, perm, themeService),
           12.verticalSpace,
 
           // 2. Search Box & View Switcher (Brand vs Flat)
@@ -72,9 +78,9 @@ class ProductsScreen extends StatelessWidget {
               }
 
               if (controller.isBrandView.value) {
-                return _buildBrandGroupedList(controller, context, themeService);
+                return _buildBrandGroupedList(controller, perm, context, themeService);
               } else {
-                return _buildFlatList(controller, context, themeService);
+                return _buildFlatList(controller, perm, context, themeService);
               }
             }),
           ),
@@ -84,12 +90,17 @@ class ProductsScreen extends StatelessWidget {
     );
   }
 
-  // --- 1. Stock Valuation Bar ---
-  Widget _buildValuationHeader(ProductsController controller, ThemeLanguageService themeService) {
+  // --- 1. Stock Valuation Bar (Role-Aware) ---
+  Widget _buildValuationHeader(
+    ProductsController controller,
+    PermissionService perm,
+    ThemeLanguageService themeService,
+  ) {
     return Obx(() {
       final totalValuation = controller.totalStockValue;
       final totalUnits = controller.db.totalStockPieces;
       final totalBrands = controller.db.allBrands.length;
+      final totalProducts = controller.db.products.length;
 
       return Container(
         margin: EdgeInsets.symmetric(horizontal: 16.w),
@@ -114,7 +125,7 @@ class ProductsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'stock_valuation'.tr,
+                    perm.canViewFinancialMetrics ? 'stock_valuation'.tr : 'Stock Availability',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: getTextStyle(
@@ -128,7 +139,9 @@ class ProductsScreen extends StatelessWidget {
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      '৳${totalValuation.toStringAsFixed(0)}',
+                      perm.canViewFinancialMetrics
+                          ? '৳${totalValuation.toStringAsFixed(0)}'
+                          : '$totalProducts SKUs Ready',
                       style: getTextStyle(
                         fontSize: 18.sp,
                         fontWeight: FontWeight.w800,
@@ -316,6 +329,7 @@ class ProductsScreen extends StatelessWidget {
   // --- 3. Brand Grouped View ---
   Widget _buildBrandGroupedList(
     ProductsController controller,
+    PermissionService perm,
     BuildContext context,
     ThemeLanguageService themeService,
   ) {
@@ -351,9 +365,9 @@ class ProductsScreen extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16.r),
-                    topRight: Radius.circular(16.r),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
                   ),
                 ),
                 child: Row(
@@ -381,7 +395,9 @@ class ProductsScreen extends StatelessWidget {
                     ),
                     8.horizontalSpace,
                     Text(
-                      '$brandUnits pcs • ৳${brandValuation.toStringAsFixed(0)}',
+                      perm.canViewFinancialMetrics
+                          ? '$brandUnits pcs • ৳${brandValuation.toStringAsFixed(0)}'
+                          : '$brandUnits units available',
                       style: getTextStyle(
                         fontSize: 12.sp,
                         fontWeight: FontWeight.w600,
@@ -400,7 +416,7 @@ class ProductsScreen extends StatelessWidget {
                 separatorBuilder: (c, i) => Divider(height: 16.h, color: themeService.inputBorderColor),
                 itemBuilder: (context, pIndex) {
                   final product = productList[pIndex];
-                  return _buildProductRowItem(product, controller, context, themeService);
+                  return _buildProductRowItem(product, controller, perm, context, themeService);
                 },
               ),
             ],
@@ -413,6 +429,7 @@ class ProductsScreen extends StatelessWidget {
   // --- 4. Flat List View ---
   Widget _buildFlatList(
     ProductsController controller,
+    PermissionService perm,
     BuildContext context,
     ThemeLanguageService themeService,
   ) {
@@ -435,16 +452,17 @@ class ProductsScreen extends StatelessWidget {
               ),
             ],
           ),
-          child: _buildProductRowItem(product, controller, context, themeService),
+          child: _buildProductRowItem(product, controller, perm, context, themeService),
         );
       },
     );
   }
 
-  // --- Product Row Item with Quick Qty controls ---
+  // --- Product Row Item (Staff Privacy Firewall Compliant) ---
   Widget _buildProductRowItem(
     dynamic product,
     ProductsController controller,
+    PermissionService perm,
     BuildContext context,
     ThemeLanguageService themeService,
   ) {
@@ -477,11 +495,14 @@ class ProductsScreen extends StatelessWidget {
                     ),
                   ),
                   4.verticalSpace,
+                  // Price line: Staff NEVER sees acquisition cost
                   Text(
-                    'Code: ${product.productCode} • Cost: ৳${product.pricePerPiece.toStringAsFixed(0)}/pc',
+                    perm.canViewPurchaseCost
+                        ? 'Code: ${product.productCode} • Cost: ৳${product.pricePerPiece.toStringAsFixed(0)} • Sell: ৳${product.sellingPrice.toStringAsFixed(0)}'
+                        : 'Code: ${product.productCode} • Selling Price: ৳${product.sellingPrice.toStringAsFixed(0)}',
                     style: getTextStyle(
                       fontSize: 11.sp,
-                      fontWeight: FontWeight.w400,
+                      fontWeight: FontWeight.w500,
                       color: themeService.subtextColor,
                     ),
                   ),
@@ -509,69 +530,105 @@ class ProductsScreen extends StatelessWidget {
                   ),
                 ),
                 4.verticalSpace,
-                Text(
-                  'Val: ৳${product.totalPrice.toStringAsFixed(0)}',
-                  style: getTextStyle(
-                    fontSize: 11.sp,
-                    fontWeight: FontWeight.w600,
-                    color: themeService.subtextColor,
+                // Total valuation: Hidden from Staff
+                if (perm.canViewFinancialMetrics)
+                  Text(
+                    'Val: ৳${product.totalPrice.toStringAsFixed(0)}',
+                    style: getTextStyle(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w600,
+                      color: themeService.subtextColor,
+                    ),
+                  )
+                else
+                  Text(
+                    isLowStock ? 'Low Stock' : 'In Stock',
+                    style: getTextStyle(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w600,
+                      color: isLowStock ? AppColors.error : AppColors.secondary,
+                    ),
                   ),
-                ),
               ],
             ),
           ],
         ),
         8.verticalSpace,
-        // Quick Quantity Buttons [-10] [-1] [+1] [+10] & Edit Button
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Flexible(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildQuickQtyBtn('-10', () => controller.adjustQuantity(product.id, -10), themeService),
-                    4.horizontalSpace,
-                    _buildQuickQtyBtn('-1', () => controller.adjustQuantity(product.id, -1), themeService),
-                    4.horizontalSpace,
-                    _buildQuickQtyBtn('+1', () => controller.adjustQuantity(product.id, 1), themeService),
-                    4.horizontalSpace,
-                    _buildQuickQtyBtn('+10', () => controller.adjustQuantity(product.id, 10), themeService),
-                  ],
+
+        // Actions: Quick Quantity & Edit are Manager/Owner ONLY
+        if (perm.canManageInventory)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildQuickQtyBtn('-10', () => controller.adjustQuantity(product.id, -10), themeService),
+                      4.horizontalSpace,
+                      _buildQuickQtyBtn('-1', () => controller.adjustQuantity(product.id, -1), themeService),
+                      4.horizontalSpace,
+                      _buildQuickQtyBtn('+1', () => controller.adjustQuantity(product.id, 1), themeService),
+                      4.horizontalSpace,
+                      _buildQuickQtyBtn('+10', () => controller.adjustQuantity(product.id, 10), themeService),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            8.horizontalSpace,
-            GestureDetector(
-              onTap: () => context.push(
-                AppRoute.addEditProductScreen,
-                extra: product,
-              ),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8.r),
+              8.horizontalSpace,
+              GestureDetector(
+                onTap: () => context.push(
+                  AppRoute.addEditProductScreen,
+                  extra: product,
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.edit_rounded, size: 12.w, color: AppColors.primary),
-                    4.horizontalSpace,
-                    Text(
-                      'Edit',
-                      style: getTextStyle(
-                        fontSize: 11.sp,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_rounded, size: 12.w, color: AppColors.primary),
+                      4.horizontalSpace,
+                      Text(
+                        'Edit',
+                        style: getTextStyle(
+                          fontSize: 11.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          )
+        else
+          // Staff View: Direct Quick POS Sale button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () {
+                  if (Get.isRegistered<BottomNavigationController>()) {
+                    Get.find<BottomNavigationController>().changeTab(2);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                  foregroundColor: AppColors.primary,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                ),
+                icon: Icon(Icons.point_of_sale_rounded, size: 14.w),
+                label: Text('Sell in POS', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
       ],
     );
   }

@@ -63,6 +63,8 @@ class ThemeLanguageService extends GetxService {
     return AppColors.backgroundNeutral;
   }
 
+  Color get scaffoldBackgroundColor => backgroundColor;
+
   Color get textColor {
     if (currentThemeMode.value == AppThemeMode.midnight) return AppColors.midnightTextPrimary;
     if (currentThemeMode.value == AppThemeMode.dark) return AppColors.darkTextPrimary;

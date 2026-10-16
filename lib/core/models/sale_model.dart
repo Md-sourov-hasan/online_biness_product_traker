@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'product_model.dart';
 
 class Sale {
   final String id;
@@ -8,10 +9,16 @@ class Sale {
   final String catalogName;
   final String productCode;
   final int quantity;
-  final double unitCost; // Buying cost per piece
-  final double unitPrice; // Sold price per piece
-  final double totalPrice; // quantity * unitPrice (Revenue)
-  final double profit; // (unitPrice - unitCost) * quantity
+  final double unitCost; // Acquisition cost attributable to unit sold (COGS)
+  final double unitPrice; // Base selling price before discount
+  final double discountAmount; // Authorized discount reduction
+  final double totalPrice; // Net sales revenue: (quantity * unitPrice) - discountAmount
+  final double profit; // Gross profit: totalPrice - (quantity * unitCost)
+  final String paymentMethod;
+  final String sellerId;
+  final String sellerName;
+  final String sellerRole;
+  final String status; // 'completed', 'corrected', 'refunded', 'exchanged'
   final DateTime timestamp;
   final String notes;
 
@@ -25,13 +32,24 @@ class Sale {
     required this.quantity,
     required this.unitCost,
     required this.unitPrice,
+    this.discountAmount = 0.0,
     double? totalPrice,
     double? profit,
+    this.paymentMethod = 'Cash',
+    this.sellerId = '',
+    this.sellerName = 'Staff',
+    this.sellerRole = 'Staff',
+    this.status = 'completed',
     DateTime? timestamp,
     this.notes = '',
-  })  : totalPrice = totalPrice ?? (quantity * unitPrice),
-        profit = profit ?? ((unitPrice - unitCost) * quantity),
+  })  : totalPrice = totalPrice ?? ((quantity * unitPrice) - discountAmount),
+        profit = profit ??
+            ((totalPrice ?? ((quantity * unitPrice) - discountAmount)) -
+                (unitCost * quantity)),
         timestamp = timestamp ?? DateTime.now();
+
+  double get grossSales => quantity * unitPrice;
+  double get cogs => unitCost * quantity;
 
   factory Sale.fromMap(Map<String, dynamic> data, String documentId) {
     DateTime parseDate(dynamic val) {
@@ -44,6 +62,9 @@ class Sale {
     final qty = (data['quantity'] ?? 0) as int;
     final cost = (data['unitCost'] ?? 0.0).toDouble();
     final price = (data['unitPrice'] ?? 0.0).toDouble();
+    final discount = (data['discountAmount'] ?? 0.0).toDouble();
+    final total = (data['totalPrice'] ?? ((qty * price) - discount)).toDouble();
+    final prof = (data['profit'] ?? (total - (cost * qty))).toDouble();
 
     return Sale(
       id: documentId,
@@ -55,8 +76,14 @@ class Sale {
       quantity: qty,
       unitCost: cost,
       unitPrice: price,
-      totalPrice: (data['totalPrice'] ?? (qty * price)).toDouble(),
-      profit: (data['profit'] ?? ((price - cost) * qty)).toDouble(),
+      discountAmount: discount,
+      totalPrice: total,
+      profit: prof,
+      paymentMethod: data['paymentMethod'] ?? 'Cash',
+      sellerId: data['sellerId'] ?? '',
+      sellerName: data['sellerName'] ?? 'Staff',
+      sellerRole: data['sellerRole'] ?? 'Staff',
+      status: data['status'] ?? 'completed',
       timestamp: parseDate(data['timestamp'] ?? data['createdAt']),
       notes: data['notes'] ?? '',
     );
@@ -73,10 +100,93 @@ class Sale {
       'quantity': quantity,
       'unitCost': unitCost,
       'unitPrice': unitPrice,
+      'discountAmount': discountAmount,
       'totalPrice': totalPrice,
       'profit': profit,
+      'paymentMethod': paymentMethod,
+      'sellerId': sellerId,
+      'sellerName': sellerName,
+      'sellerRole': sellerRole,
+      'status': status,
       'timestamp': timestamp.toIso8601String(),
       'notes': notes,
     };
   }
+
+  Sale copyWith({
+    String? id,
+    String? productId,
+    String? productName,
+    String? brandName,
+    String? catalogName,
+    String? productCode,
+    int? quantity,
+    double? unitCost,
+    double? unitPrice,
+    double? discountAmount,
+    double? totalPrice,
+    double? profit,
+    String? paymentMethod,
+    String? sellerId,
+    String? sellerName,
+    String? sellerRole,
+    String? status,
+    DateTime? timestamp,
+    String? notes,
+  }) {
+    return Sale(
+      id: id ?? this.id,
+      productId: productId ?? this.productId,
+      productName: productName ?? this.productName,
+      brandName: brandName ?? this.brandName,
+      catalogName: catalogName ?? this.catalogName,
+      productCode: productCode ?? this.productCode,
+      quantity: quantity ?? this.quantity,
+      unitCost: unitCost ?? this.unitCost,
+      unitPrice: unitPrice ?? this.unitPrice,
+      discountAmount: discountAmount ?? this.discountAmount,
+      totalPrice: totalPrice ?? this.totalPrice,
+      profit: profit ?? this.profit,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      sellerId: sellerId ?? this.sellerId,
+      sellerName: sellerName ?? this.sellerName,
+      sellerRole: sellerRole ?? this.sellerRole,
+      status: status ?? this.status,
+      timestamp: timestamp ?? this.timestamp,
+      notes: notes ?? this.notes,
+    );
+  }
 }
+
+class SaleCartItem {
+  final Product product;
+  int quantity;
+  double unitPrice; // Sold unit price
+  double discount; // Discount on line
+  String notes;
+
+  SaleCartItem({
+    required this.product,
+    this.quantity = 1,
+    double? unitPrice,
+    this.discount = 0.0,
+    this.notes = '',
+  }) : unitPrice = unitPrice ?? product.sellingPrice;
+
+  double get grossLineTotal => quantity * unitPrice;
+  double get netLineTotal => (quantity * unitPrice) - discount;
+  double get unitCost => product.pricePerPiece;
+  double get estimatedProfit => netLineTotal - (quantity * unitCost);
+}
+
+class SaleValidationResult {
+  final bool isValid;
+  final String? errorMessage;
+
+  SaleValidationResult.success()
+      : isValid = true,
+        errorMessage = null;
+
+  SaleValidationResult.failure(this.errorMessage) : isValid = false;
+}
+

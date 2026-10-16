@@ -14,6 +14,7 @@ class AppColors {
 
   // Secondary & Accents
   static const Color secondary = Color(0xFF10B981); // Emerald Green for profit/success
+  static const Color success = secondary; // Success green alias
   static const Color accentLight = Color(0xFFEFF6FF); // Soft blue tint
   static const Color error = Color(0xFFEF4444); // Rose Red
   static const Color warning = Color(0xFFF59E0B); // Amber

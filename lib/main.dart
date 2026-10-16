@@ -6,6 +6,7 @@ import 'core/services/notification_service.dart';
 import 'core/services/database_service.dart';
 import 'core/services/theme_language_service.dart';
 import 'core/services/auth_service.dart';
+import 'core/services/permission_service.dart';
 import 'core/services/report_export_service.dart';
 import 'core/services/backup_service.dart';
 import 'core/utils/localization/app_translations.dart';
@@ -20,6 +21,7 @@ void main() async {
   await Get.putAsync(() async => DatabaseService());
   final themeLanguageService = await Get.putAsync(() async => ThemeLanguageService());
   await Get.putAsync(() async => AuthService());
+  Get.put(PermissionService());
   Get.put(ReportExportService());
   Get.put(BackupService());
 

@@ -3,8 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 TextStyle getTextStyle({
   required double fontSize,
-  required FontWeight fontWeight,
-  required Color color,
+  FontWeight fontWeight = FontWeight.normal,
+  Color color = const Color(0xFF0F172A),
   double? lineHeight,
 }) {
   return GoogleFonts.inter(

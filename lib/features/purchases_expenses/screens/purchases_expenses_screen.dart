@@ -5,6 +5,7 @@ import '../controllers/purchases_expenses_controller.dart';
 import '../../../core/models/product_model.dart';
 import '../../../core/models/expense_model.dart';
 import '../../../core/services/theme_language_service.dart';
+import '../../../core/services/permission_service.dart';
 import '../../../core/utils/constants/app_constants.dart';
 import '../../../core/common/widgets/custom_text_field.dart';
 import '../../../core/common/widgets/customize_filled_button.dart';
@@ -21,24 +22,47 @@ class PurchasesExpensesScreen extends StatefulWidget {
 }
 
 class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+  TabController? _tabController;
   final PurchasesExpensesController controller = Get.put(PurchasesExpensesController());
   final ThemeLanguageService themeService = Get.find<ThemeLanguageService>();
+  final PermissionService perm = Get.find<PermissionService>();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    if (!perm.isStaff) {
+      _tabController = TabController(length: 2, vsync: this);
+    }
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Staff Privacy View: Only view own submissions from last 30 days
+    if (perm.isStaff) {
+      return CommonBackgroundScaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          title: Text(
+            'My Expenses (Last 30 Days)',
+            style: getTextStyle(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.w700,
+              color: themeService.textColor,
+            ),
+          ),
+          elevation: 0,
+        ),
+        body: _buildExpensesTab(isStaffView: true),
+      );
+    }
+
+    // Manager & Owner View: Full Purchases & Expenses Management
     return CommonBackgroundScaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -68,13 +92,13 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
         controller: _tabController,
         children: [
           _buildPurchasesTab(),
-          _buildExpensesTab(),
+          _buildExpensesTab(isStaffView: false),
         ],
       ),
     );
   }
 
-  // --- TAB 1: Purchases (Restock) ---
+  // --- TAB 1: Purchases (Restock) - Manager / Owner only ---
   Widget _buildPurchasesTab() {
     return Column(
       children: [
@@ -95,7 +119,12 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total Stock Purchases', maxLines: 1, overflow: TextOverflow.ellipsis, style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w500, color: themeService.subtextColor)),
+                    Text(
+                      'Total Stock Purchases',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w500, color: themeService.subtextColor),
+                    ),
                     4.verticalSpace,
                     Obx(() => FittedBox(
                           fit: BoxFit.scaleDown,
@@ -202,7 +231,7 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
   }
 
   // --- TAB 2: Expenses ---
-  Widget _buildExpensesTab() {
+  Widget _buildExpensesTab({required bool isStaffView}) {
     return Column(
       children: [
         12.verticalSpace,
@@ -222,7 +251,12 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('total_expenses'.tr, maxLines: 1, overflow: TextOverflow.ellipsis, style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w500, color: themeService.subtextColor)),
+                    Text(
+                      isStaffView ? 'My Submissions (30 Days)' : 'total_expenses'.tr,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w500, color: themeService.subtextColor),
+                    ),
                     4.verticalSpace,
                     Obx(() => FittedBox(
                           fit: BoxFit.scaleDown,
@@ -244,7 +278,10 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
                   padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
                 ),
                 icon: const Icon(Icons.add_rounded, color: Colors.white, size: 16),
-                label: Text('add_expense'.tr, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                label: Text(
+                  isStaffView ? 'Submit Expense' : 'add_expense'.tr,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                ),
               ),
             ],
           ),
@@ -294,7 +331,12 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
             final list = controller.filteredExpenses;
             if (list.isEmpty) {
               return Center(
-                child: Text('No expenses recorded for this category.', style: TextStyle(color: themeService.subtextColor)),
+                child: Text(
+                  isStaffView
+                      ? 'No expenses submitted by you in the last 30 days.'
+                      : 'No expenses recorded for this category.',
+                  style: TextStyle(color: themeService.subtextColor),
+                ),
               );
             }
 
@@ -318,32 +360,56 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: EdgeInsets.all(10.w),
-                            decoration: BoxDecoration(
-                              color: AppColors.error.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12.r),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(10.w),
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12.r),
+                              ),
+                              child: Icon(Icons.receipt_rounded, color: AppColors.error, size: 20.w),
                             ),
-                            child: Icon(Icons.receipt_rounded, color: AppColors.error, size: 20.w),
-                          ),
-                          12.horizontalSpace,
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                expense.category,
-                                style: getTextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
+                            12.horizontalSpace,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        expense.category,
+                                        style: getTextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
+                                      ),
+                                      if (expense.creatorRole.isNotEmpty) ...[
+                                        6.horizontalSpace,
+                                        Container(
+                                          padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(4.r),
+                                          ),
+                                          child: Text(
+                                            expense.creatorRole,
+                                            style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w600, color: AppColors.primary),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  2.verticalSpace,
+                                  Text(
+                                    '$dateStr • ${expense.notes.isEmpty ? 'No notes' : expense.notes}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w400, color: themeService.subtextColor),
+                                  ),
+                                ],
                               ),
-                              2.verticalSpace,
-                              Text(
-                                '$dateStr • ${expense.notes.isEmpty ? 'No notes' : expense.notes}',
-                                style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w400, color: themeService.subtextColor),
-                              ),
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
                       Row(
                         children: [
@@ -351,20 +417,21 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
                             '৳${expense.amount.toStringAsFixed(0)}',
                             style: getTextStyle(fontSize: 15.sp, fontWeight: FontWeight.w800, color: AppColors.error),
                           ),
-                          PopupMenuButton<String>(
-                            icon: Icon(Icons.more_vert_rounded, color: themeService.subtextColor, size: 18.w),
-                            onSelected: (val) {
-                              if (val == 'edit') {
-                                _showAddEditExpenseModal(expense: expense);
-                              } else if (val == 'delete') {
-                                controller.deleteExpense(expense.id);
-                              }
-                            },
-                            itemBuilder: (context) => [
-                              const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                              const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: AppColors.error))),
-                            ],
-                          ),
+                          if (!isStaffView)
+                            PopupMenuButton<String>(
+                              icon: Icon(Icons.more_vert_rounded, color: themeService.subtextColor, size: 18.w),
+                              onSelected: (val) {
+                                if (val == 'edit') {
+                                  _showAddEditExpenseModal(expense: expense);
+                                } else if (val == 'delete') {
+                                  controller.deleteExpense(expense.id);
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: AppColors.error))),
+                              ],
+                            ),
                         ],
                       ),
                     ],
@@ -379,7 +446,7 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
     );
   }
 
-  // --- Modal 1: Add Restock Purchase Modal ---
+  // --- Modal 1: Add Restock Purchase Modal (with Supplier selection) ---
   void _showAddPurchaseModal() {
     Product? selectedProduct;
     final qtyController = TextEditingController(text: '10');
@@ -442,56 +509,90 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
                     ),
                     16.verticalSpace,
 
-                    // Quantity & Controls
+                    // Quantity & Quick Buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Purchase Quantity', style: getTextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: themeService.textColor)),
-                        8.horizontalSpace,
-                        Flexible(
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                _buildMiniQtyBtn('+5', () {
-                                  int q = int.tryParse(qtyController.text) ?? 0;
-                                  qtyController.text = (q + 5).toString();
-                                }),
-                                4.horizontalSpace,
-                                _buildMiniQtyBtn('+10', () {
-                                  int q = int.tryParse(qtyController.text) ?? 0;
-                                  qtyController.text = (q + 10).toString();
-                                }),
-                                4.horizontalSpace,
-                                _buildMiniQtyBtn('+50', () {
-                                  int q = int.tryParse(qtyController.text) ?? 0;
-                                  qtyController.text = (q + 50).toString();
-                                }),
-                              ],
-                            ),
-                          ),
+                        Row(
+                          children: [
+                            _buildMiniQtyBtn('+10', () {
+                              final curr = int.tryParse(qtyController.text) ?? 0;
+                              qtyController.text = (curr + 10).toString();
+                            }),
+                            6.horizontalSpace,
+                            _buildMiniQtyBtn('+50', () {
+                              final curr = int.tryParse(qtyController.text) ?? 0;
+                              qtyController.text = (curr + 50).toString();
+                            }),
+                          ],
                         ),
                       ],
                     ),
                     8.verticalSpace,
-                    CustomTextField(label: '', hintText: 'Quantity', controller: qtyController, keyboardType: TextInputType.number),
+                    CustomTextField(
+                      label: '',
+                      hintText: '10',
+                      controller: qtyController,
+                      keyboardType: TextInputType.number,
+                    ),
                     16.verticalSpace,
 
-                    // Cost Price Per Piece
-                    CustomTextField(label: 'cost_per_piece'.tr, hintText: '0', controller: costController, keyboardType: TextInputType.number),
+                    // Unit Cost
+                    CustomTextField(
+                      label: 'cost_per_piece'.tr,
+                      hintText: '0',
+                      controller: costController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
                     16.verticalSpace,
 
-                    // Supplier
-                    CustomTextField(label: 'supplier_vendor'.tr, hintText: 'e.g. Official Importer Ltd.', controller: supplierController),
+                    // Supplier with fast chips from Supplier Directory
+                    Text('Supplier / Vendor', style: getTextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: themeService.textColor)),
+                    8.verticalSpace,
+                    if (controller.db.suppliers.isNotEmpty) ...[
+                      SizedBox(
+                        height: 28.h,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: controller.db.suppliers.length,
+                          separatorBuilder: (c, i) => 6.horizontalSpace,
+                          itemBuilder: (c, i) {
+                            final sup = controller.db.suppliers[i];
+                            return GestureDetector(
+                              onTap: () => setModalState(() => supplierController.text = sup.name),
+                              child: Container(
+                                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 3.h),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6.r),
+                                ),
+                                child: Text(sup.name, style: TextStyle(fontSize: 11.sp, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      8.verticalSpace,
+                    ],
+                    CustomTextField(
+                      label: '',
+                      hintText: 'e.g. Dhaka Wholesale Ltd',
+                      controller: supplierController,
+                    ),
                     16.verticalSpace,
 
                     // Notes
-                    CustomTextField(label: 'notes'.tr, hintText: 'Batch no., invoice ref, etc.', controller: notesController),
+                    CustomTextField(
+                      label: 'notes'.tr,
+                      hintText: 'Invoice no., batch number, etc.',
+                      controller: notesController,
+                    ),
                     24.verticalSpace,
 
                     // Submit
                     CustomFilledButton(
-                      text: 'Save Restock Purchase',
+                      text: 'Confirm Restock Purchase',
                       onPressed: () {
                         if (selectedProduct == null) {
                           Get.snackbar('Error', 'Please select a product');
@@ -550,7 +651,10 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
                   children: [
                     Center(child: Container(width: 40.w, height: 4.h, decoration: BoxDecoration(color: themeService.inputBorderColor, borderRadius: BorderRadius.circular(2.r)))),
                     12.verticalSpace,
-                    Text(isEdit ? 'edit_expense'.tr : 'add_expense'.tr, style: getTextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700, color: themeService.textColor)),
+                    Text(
+                      isEdit ? 'edit_expense'.tr : (perm.isStaff ? 'Submit Operational Expense' : 'add_expense'.tr),
+                      style: getTextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
+                    ),
                     16.verticalSpace,
 
                     // Category Dropdown
@@ -596,14 +700,14 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
                     // Notes
                     CustomTextField(
                       label: 'notes'.tr,
-                      hintText: 'Electricity bill, Shop cleaner, etc.',
+                      hintText: 'Courier charge, Tea/snacks, packaging material...',
                       controller: notesController,
                     ),
                     24.verticalSpace,
 
                     // Submit
                     CustomFilledButton(
-                      text: isEdit ? 'Save Changes' : 'Record Expense',
+                      text: isEdit ? 'Save Changes' : 'Submit Expense Record',
                       color: AppColors.error,
                       onPressed: () {
                         final amt = double.tryParse(amountController.text) ?? 0.0;
@@ -619,6 +723,9 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
                             amount: amt,
                             notes: notesController.text.trim(),
                             date: selectedDate,
+                            creatorId: expense.creatorId,
+                            creatorName: expense.creatorName,
+                            creatorRole: expense.creatorRole,
                             createdAt: expense.createdAt,
                           ));
                         } else {
