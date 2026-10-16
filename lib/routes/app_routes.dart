@@ -13,6 +13,7 @@ import '../features/owner_controls/screens/money_lent_screen.dart';
 import '../features/owner_controls/screens/policy_control_screen.dart';
 import '../features/owner_controls/screens/discount_management_screen.dart';
 import '../features/owner_controls/screens/supplier_management_screen.dart';
+import '../features/auth/screens/login_screen.dart';
 import '../core/models/product_model.dart';
 
 class AppRoute {
@@ -20,6 +21,7 @@ class AppRoute {
   // Route Constants
   // ---------------------------------------------------------------------------
   static const String splashScreen = "/";
+  static const String loginScreen = "/login";
   static const String bottomNavigationScreen = "/home";
   static const String addEditProductScreen = "/add-edit-product";
   static const String settingsScreen = "/settings";
@@ -44,6 +46,14 @@ class AppRoute {
       GoRoute(
         path: splashScreen,
         builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: loginScreen,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const LoginScreen(),
+        ),
       ),
       GoRoute(
         path: bottomNavigationScreen,

@@ -83,11 +83,54 @@ class AuthService extends GetxService {
     }
   }
 
+  Future<void> loginAsRole(String roleName, {String? customName, String? customEmail}) async {
+    isLoading.value = true;
+    final db = Get.find<DatabaseService>();
+
+    String userId;
+    String name;
+    String email;
+
+    if (roleName.contains('Owner') || roleName.contains('Super Admin')) {
+      userId = 'owner_1';
+      name = customName ?? 'Sourov Hasan (Owner)';
+      email = customEmail ?? 'owner@stockmate.com';
+    } else if (roleName.contains('Manager')) {
+      userId = 'manager_1';
+      name = customName ?? 'Store Manager';
+      email = customEmail ?? 'manager@stockmate.com';
+    } else {
+      userId = 'staff_1';
+      name = customName ?? 'Sales Associate (Staff)';
+      email = customEmail ?? 'staff@stockmate.com';
+    }
+
+    final user = AppUser(
+      id: userId,
+      name: name,
+      email: email,
+      role: roleName,
+      approvalStatus: 'approved',
+      deviceName: 'Active Terminal',
+      createdAt: DateTime.now(),
+    );
+
+    currentUser.value = user;
+    isLoggedIn.value = true;
+    await _prefs?.setString('sm_auth_email', email);
+
+    db.logActivity('auth', 'Session Login ($roleName)', '$name signed in with active $roleName role privileges.');
+
+    isLoading.value = false;
+  }
+
   void switchUserRole(String role) {
     if (currentUser.value != null) {
       final updated = currentUser.value!.copyWith(role: role, approvalStatus: 'approved');
       currentUser.value = updated;
       Get.snackbar('Role Switched', 'Current role set to: $role', snackPosition: SnackPosition.BOTTOM);
+    } else {
+      loginAsRole(role);
     }
   }
 

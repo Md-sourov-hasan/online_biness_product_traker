@@ -105,6 +105,28 @@ class SettingsScreen extends StatelessWidget {
               24.verticalSpace,
             ],
 
+            // 6. Log Out & Switch User Role (Accessible to all roles)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await auth.logout();
+                  if (context.mounted) {
+                    context.go(AppRoute.loginScreen);
+                  }
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                  padding: EdgeInsets.symmetric(vertical: 12.h),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                ),
+                icon: const Icon(Icons.logout_rounded, size: 18),
+                label: const Text('Log Out & Switch User Role', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+            24.verticalSpace,
+
             // App Tagline & Footer
             Center(
               child: Column(
