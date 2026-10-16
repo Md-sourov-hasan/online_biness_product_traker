@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../controllers/orders_controller.dart';
 import '../../../core/utils/sizer.dart';
 import '../../../core/utils/constants/colors.dart';
 import '../../../core/common/styles/global_text_style.dart';
 import '../../../core/common/widgets/common_background.dart';
-import '../../../routes/app_routes.dart';
-import 'package:intl/intl.dart';
 
 class OrdersScreen extends StatelessWidget {
   const OrdersScreen({super.key});
@@ -27,20 +25,13 @@ class OrdersScreen extends StatelessWidget {
             color: AppColors.textPrimary,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.add_circle, color: AppColors.primary, size: 28.w),
-            onPressed: () => context.push(AppRoute.addOrderScreen),
-          ),
-          16.horizontalSpace,
-        ],
         elevation: 0,
       ),
       body: Obx(() {
         if (controller.orders.isEmpty) {
           return Center(
             child: Text(
-              'No orders yet.\nTap + to create one.',
+              'No orders yet.',
               textAlign: TextAlign.center,
               style: getTextStyle(
                 fontSize: 16.sp,
@@ -51,24 +42,13 @@ class OrdersScreen extends StatelessWidget {
           );
         }
 
-        // Sort orders by date descending
-        final sortedOrders = List.from(controller.orders)
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
         return ListView.separated(
           padding: EdgeInsets.all(16.w),
-          itemCount: sortedOrders.length,
+          itemCount: controller.orders.length,
           separatorBuilder: (context, index) => 12.verticalSpace,
           itemBuilder: (context, index) {
-            final order = sortedOrders[index];
+            final order = controller.orders[index];
             final dateStr = DateFormat('MMM dd, yyyy • hh:mm a').format(order.createdAt);
-            
-            Color statusColor;
-            switch(order.status) {
-              case 'completed': statusColor = AppColors.secondary; break;
-              case 'cancelled': statusColor = AppColors.error; break;
-              default: statusColor = AppColors.warning;
-            }
 
             return Container(
               padding: EdgeInsets.all(16.w),
@@ -77,7 +57,7 @@ class OrdersScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16.r),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
+                    color: Colors.black.withValues(alpha: 0.03),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -100,7 +80,7 @@ class OrdersScreen extends StatelessWidget {
                       Container(
                         padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                         decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.1),
+                          color: AppColors.secondary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8.r),
                         ),
                         child: Text(
@@ -108,7 +88,7 @@ class OrdersScreen extends StatelessWidget {
                           style: getTextStyle(
                             fontSize: 10.sp,
                             fontWeight: FontWeight.w600,
-                            color: statusColor,
+                            color: AppColors.secondary,
                           ),
                         ),
                       ),

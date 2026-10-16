@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
-import '../controller/splash_screen_controller.dart';
+import '../../../core/utils/constants/app_constants.dart';
 import '../../../core/utils/constants/colors.dart';
 import '../../../core/utils/sizer.dart';
 import '../../../core/common/styles/global_text_style.dart';
@@ -14,13 +13,30 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
-  final SplashScreenController controller = Get.put(SplashScreenController());
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 2), () {
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeOutBack),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeIn),
+    );
+
+    _animController.forward();
+
+    Future.delayed(const Duration(milliseconds: 2200), () {
       if (mounted) {
         context.go(AppRoute.bottomNavigationScreen);
       }
@@ -28,37 +44,83 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.primary,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.inventory_2_rounded,
-              size: 80.w,
-              color: Colors.white,
-            ),
-            16.verticalSpace,
-            Text(
-              'TrackIt',
-              style: getTextStyle(
-                fontSize: 32.sp,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+      backgroundColor: const Color(0xFF0F172A), // Dark slate void
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF0F172A), Color(0xFF1E3A8A)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Center(
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 100.w,
+                    height: 100.w,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(24.r),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.5),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.inventory_2_rounded,
+                      size: 54.w,
+                      color: Colors.white,
+                    ),
+                  ),
+                  24.verticalSpace,
+                  Text(
+                    AppConstants.appName,
+                    style: getTextStyle(
+                      fontSize: 34.sp,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                  8.verticalSpace,
+                  Text(
+                    AppConstants.appTagline,
+                    textAlign: TextAlign.center,
+                    style: getTextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  48.verticalSpace,
+                  SizedBox(
+                    width: 24.w,
+                    height: 24.w,
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.secondary),
+                    ),
+                  ),
+                ],
               ),
             ),
-            8.verticalSpace,
-            Text(
-              'Smart Inventory & Sales',
-              style: getTextStyle(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w400,
-                color: Colors.white.withOpacity(0.8),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

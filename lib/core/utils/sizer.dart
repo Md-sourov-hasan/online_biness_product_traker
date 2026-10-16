@@ -13,8 +13,9 @@ class Sizer {
     final Size size = MediaQuery.sizeOf(context);
     _screenWidth = size.width;
     _screenHeight = size.height;
-    _blockSizeHorizontal = _screenWidth / designWidth;
-    _blockSizeVertical = _screenHeight / designHeight;
+    // Keep responsive scaling optimal for mobile while protecting against oversized screen blowouts
+    _blockSizeHorizontal = (_screenWidth / designWidth).clamp(0.8, 1.25);
+    _blockSizeVertical = (_screenHeight / designHeight).clamp(0.8, 1.25);
   }
 
   // Responsive width

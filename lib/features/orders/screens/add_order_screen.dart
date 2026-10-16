@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import '../controllers/orders_controller.dart';
-import '../../products/controllers/products_controller.dart';
+import '../../../core/services/database_service.dart';
 import '../../../core/models/order_model.dart';
 import '../../../core/models/product_model.dart';
 import '../../../core/common/widgets/custom_text_field.dart';
@@ -21,8 +21,8 @@ class AddOrderScreen extends StatefulWidget {
 
 class _AddOrderScreenState extends State<AddOrderScreen> {
   late final OrdersController controller;
-  late final ProductsController productsController;
-  
+  late final DatabaseService db;
+
   final TextEditingController customerNameController = TextEditingController();
   final RxList<OrderItem> selectedItems = <OrderItem>[].obs;
   Product? selectedProduct;
@@ -34,32 +34,30 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
     controller = Get.isRegistered<OrdersController>()
         ? Get.find<OrdersController>()
         : Get.put(OrdersController());
-    productsController = Get.isRegistered<ProductsController>()
-        ? Get.find<ProductsController>()
-        : Get.put(ProductsController());
+    db = Get.find<DatabaseService>();
   }
 
   void _addItem() {
     if (selectedProduct == null) return;
-    
+
     int qty = int.tryParse(quantityController.text) ?? 0;
     if (qty <= 0) {
       Get.snackbar('Error', 'Quantity must be at least 1');
       return;
     }
-    if (qty > selectedProduct!.stockQuantity) {
+    if (qty > selectedProduct!.quantity) {
       Get.snackbar('Error', 'Not enough stock available');
       return;
     }
 
+    final salePrice = selectedProduct!.pricePerPiece * 1.25;
     selectedItems.add(OrderItem(
       productId: selectedProduct!.id,
-      productName: selectedProduct!.name,
+      productName: selectedProduct!.displayName,
       quantity: qty,
-      priceAtSale: selectedProduct!.sellingPrice,
+      priceAtSale: salePrice,
     ));
 
-    // Reset selection
     setState(() {
       selectedProduct = null;
       quantityController.text = '1';
@@ -88,7 +86,7 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
           ),
         ),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => context.pop(),
         ),
         elevation: 0,
@@ -129,10 +127,10 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
                         isExpanded: true,
                         value: selectedProduct,
                         hint: Text('Select a product', style: getTextStyle(fontSize: 14.sp, fontWeight: FontWeight.w400, color: AppColors.textSecondary)),
-                        items: productsController.products.map((p) {
+                        items: db.products.map((p) {
                           return DropdownMenuItem(
                             value: p,
-                            child: Text('${p.name} (৳${p.sellingPrice}) - ${p.stockQuantity} left', overflow: TextOverflow.ellipsis),
+                            child: Text('${p.displayName} - ${p.quantity} left', overflow: TextOverflow.ellipsis),
                           );
                         }).toList(),
                         onChanged: (val) => setState(() => selectedProduct = val),
@@ -164,7 +162,7 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
             Expanded(
               child: Obx(() {
                 if (selectedItems.isEmpty) {
-                  return Center(child: Text('No items added yet', style: TextStyle(color: AppColors.textSecondary)));
+                  return const Center(child: Text('No items added yet', style: TextStyle(color: AppColors.textSecondary)));
                 }
                 return ListView.builder(
                   itemCount: selectedItems.length,
@@ -172,9 +170,9 @@ class _AddOrderScreenState extends State<AddOrderScreen> {
                     final item = selectedItems[index];
                     return ListTile(
                       title: Text(item.productName),
-                      subtitle: Text('${item.quantity} x ৳${item.priceAtSale}'),
+                      subtitle: Text('${item.quantity} x ৳${item.priceAtSale.toStringAsFixed(0)}'),
                       trailing: IconButton(
-                        icon: Icon(Icons.delete, color: AppColors.error),
+                        icon: const Icon(Icons.delete, color: AppColors.error),
                         onPressed: () => selectedItems.removeAt(index),
                       ),
                     );

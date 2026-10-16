@@ -2,80 +2,114 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Product {
   final String id;
-  final String name;
-  final String sku;
-  final String category;
-  final double costPrice;
-  final double sellingPrice;
-  final int stockQuantity;
+  final String brandName;
+  final String catalogName;
+  final String productCode;
+  final int quantity;
+  final double pricePerPiece; // Cost price per unit
+  final double totalPrice; // Auto-calculated (quantity * pricePerPiece)
+  final DateTime buyingDate;
+  final String notes;
   final int lowStockThreshold;
   final String? imageUrl;
   final DateTime createdAt;
 
   Product({
     required this.id,
-    required this.name,
-    required this.sku,
-    required this.category,
-    required this.costPrice,
-    required this.sellingPrice,
-    required this.stockQuantity,
+    required this.brandName,
+    required this.catalogName,
+    required this.productCode,
+    required this.quantity,
+    required this.pricePerPiece,
+    double? totalPrice,
+    DateTime? buyingDate,
+    this.notes = '',
     this.lowStockThreshold = 3,
     this.imageUrl,
-    required this.createdAt,
-  });
+    DateTime? createdAt,
+  })  : totalPrice = totalPrice ?? (quantity * pricePerPiece),
+        buyingDate = buyingDate ?? DateTime.now(),
+        createdAt = createdAt ?? DateTime.now();
+
+  String get displayName => '$brandName $catalogName'.trim();
+
+  // Backward compatibility getter for existing UI referencing .name & .costPrice
+  String get name => displayName;
+  double get costPrice => pricePerPiece;
+  int get stockQuantity => quantity;
+  String get sku => productCode;
+  String get category => brandName;
 
   factory Product.fromMap(Map<String, dynamic> data, String documentId) {
+    DateTime parseDate(dynamic val) {
+      if (val is Timestamp) return val.toDate();
+      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
+      return DateTime.now();
+    }
+
+    final qty = (data['quantity'] ?? data['stockQuantity'] ?? 0) as int;
+    final cost = (data['pricePerPiece'] ?? data['costPrice'] ?? 0.0).toDouble();
+
     return Product(
       id: documentId,
-      name: data['name'] ?? '',
-      sku: data['sku'] ?? '',
-      category: data['category'] ?? '',
-      costPrice: (data['costPrice'] ?? 0.0).toDouble(),
-      sellingPrice: (data['sellingPrice'] ?? 0.0).toDouble(),
-      stockQuantity: data['stockQuantity'] ?? 0,
+      brandName: data['brandName'] ?? data['category'] ?? 'General',
+      catalogName: data['catalogName'] ?? data['name'] ?? '',
+      productCode: data['productCode'] ?? data['sku'] ?? '',
+      quantity: qty,
+      pricePerPiece: cost,
+      totalPrice: (data['totalPrice'] ?? (qty * cost)).toDouble(),
+      buyingDate: parseDate(data['buyingDate']),
+      notes: data['notes'] ?? '',
       lowStockThreshold: data['lowStockThreshold'] ?? 3,
       imageUrl: data['imageUrl'],
-      createdAt: data['createdAt'] != null 
-          ? (data['createdAt'] as Timestamp).toDate() 
-          : DateTime.now(),
+      createdAt: parseDate(data['createdAt']),
     );
   }
 
   Map<String, dynamic> toMap() {
     return {
-      'name': name,
-      'sku': sku,
-      'category': category,
-      'costPrice': costPrice,
-      'sellingPrice': sellingPrice,
-      'stockQuantity': stockQuantity,
+      'id': id,
+      'brandName': brandName,
+      'catalogName': catalogName,
+      'productCode': productCode,
+      'quantity': quantity,
+      'pricePerPiece': pricePerPiece,
+      'totalPrice': totalPrice,
+      'buyingDate': buyingDate.toIso8601String(),
+      'notes': notes,
       'lowStockThreshold': lowStockThreshold,
       'imageUrl': imageUrl,
-      'createdAt': Timestamp.fromDate(createdAt),
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 
   Product copyWith({
     String? id,
-    String? name,
-    String? sku,
-    String? category,
-    double? costPrice,
-    double? sellingPrice,
-    int? stockQuantity,
+    String? brandName,
+    String? catalogName,
+    String? productCode,
+    int? quantity,
+    double? pricePerPiece,
+    double? totalPrice,
+    DateTime? buyingDate,
+    String? notes,
     int? lowStockThreshold,
     String? imageUrl,
     DateTime? createdAt,
   }) {
+    final updatedQty = quantity ?? this.quantity;
+    final updatedCost = pricePerPiece ?? this.pricePerPiece;
     return Product(
       id: id ?? this.id,
-      name: name ?? this.name,
-      sku: sku ?? this.sku,
-      category: category ?? this.category,
-      costPrice: costPrice ?? this.costPrice,
-      sellingPrice: sellingPrice ?? this.sellingPrice,
-      stockQuantity: stockQuantity ?? this.stockQuantity,
+      brandName: brandName ?? this.brandName,
+      catalogName: catalogName ?? this.catalogName,
+      productCode: productCode ?? this.productCode,
+      quantity: updatedQty,
+      pricePerPiece: updatedCost,
+      totalPrice: totalPrice ?? (updatedQty * updatedCost),
+      buyingDate: buyingDate ?? this.buyingDate,
+      notes: notes ?? this.notes,
       lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
       imageUrl: imageUrl ?? this.imageUrl,
       createdAt: createdAt ?? this.createdAt,

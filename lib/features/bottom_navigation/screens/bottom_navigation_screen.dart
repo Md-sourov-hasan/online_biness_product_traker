@@ -4,9 +4,9 @@ import '../controllers/bottom_navigation_controller.dart';
 import '../widgets/custom_bottom_navigation.dart';
 import '../../dashboard/screens/dashboard_screen.dart';
 import '../../products/screens/products_screen.dart';
-import '../../orders/screens/orders_screen.dart';
+import '../../sales/screens/sales_screen.dart';
+import '../../purchases_expenses/screens/purchases_expenses_screen.dart';
 import '../../reports/screens/reports_screen.dart';
-import '../../settings/screens/settings_screen.dart';
 
 class BottomNavigationScreen extends StatelessWidget {
   const BottomNavigationScreen({super.key});
@@ -44,11 +44,11 @@ class BottomNavigationScreen extends StatelessWidget {
       case 1:
         return const ProductsScreen();
       case 2:
-        return const OrdersScreen();
+        return const SalesScreen();
       case 3:
-        return const ReportsScreen();
+        return const PurchasesExpensesScreen();
       case 4:
-        return const SettingsScreen();
+        return const ReportsScreen();
       default:
         return const DashboardScreen();
     }

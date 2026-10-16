@@ -12,14 +12,14 @@ class CustomFilledButton extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
 
   const CustomFilledButton({
-    Key? key,
+    super.key,
     required this.text,
     required this.onPressed,
     this.isLoading = false,
     this.color,
     this.textColor,
     this.padding,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +27,7 @@ class CustomFilledButton extends StatelessWidget {
       padding: padding ?? EdgeInsets.zero,
       child: SizedBox(
         width: double.infinity,
-        height: 52.h,
+        height: 50.h,
         child: ElevatedButton(
           onPressed: isLoading ? null : onPressed,
           style: ElevatedButton.styleFrom(
@@ -49,8 +49,8 @@ class CustomFilledButton extends StatelessWidget {
               : Text(
                   text,
                   style: getTextStyle(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w700,
                     color: textColor ?? Colors.white,
                   ),
                 ),

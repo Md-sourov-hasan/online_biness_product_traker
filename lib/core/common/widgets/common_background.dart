@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../utils/constants/colors.dart';
+import 'package:get/get.dart';
+import '../../services/theme_language_service.dart';
 
 class CommonBackgroundScaffold extends StatelessWidget {
   final Widget body;
@@ -8,17 +9,24 @@ class CommonBackgroundScaffold extends StatelessWidget {
   final Widget? floatingActionButton;
 
   const CommonBackgroundScaffold({
-    Key? key,
+    super.key,
     required this.body,
     this.appBar,
     this.bottomNavigationBar,
     this.floatingActionButton,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
+    Color bgColor = Theme.of(context).scaffoldBackgroundColor;
+    try {
+      if (Get.isRegistered<ThemeLanguageService>()) {
+        bgColor = Get.find<ThemeLanguageService>().backgroundColor;
+      }
+    } catch (_) {}
+
     return Scaffold(
-      backgroundColor: AppColors.backgroundNeutral,
+      backgroundColor: bgColor,
       appBar: appBar,
       bottomNavigationBar: bottomNavigationBar,
       floatingActionButton: floatingActionButton,

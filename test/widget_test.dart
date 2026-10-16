@@ -1,30 +1,38 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:get/get.dart';
 import 'package:online_buiness_product_traker/main.dart';
+import 'package:online_buiness_product_traker/core/services/theme_language_service.dart';
+import 'package:online_buiness_product_traker/core/services/database_service.dart';
+import 'package:online_buiness_product_traker/core/services/auth_service.dart';
+import 'package:online_buiness_product_traker/core/services/notification_service.dart';
+import 'package:online_buiness_product_traker/core/services/report_export_service.dart';
+import 'package:online_buiness_product_traker/core/services/backup_service.dart';
+import 'package:online_buiness_product_traker/core/utils/connectivity_service.dart';
+import 'package:online_buiness_product_traker/features/dashboard/controllers/dashboard_controller.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('App smoke test', (WidgetTester tester) async {
+    Get.testMode = true;
+    Get.put(ConnectivityService());
+    Get.put(NotificationService());
+    final db = DatabaseService();
+    Get.put(db);
+    final themeService = ThemeLanguageService();
+    Get.put(themeService);
+    Get.put(AuthService());
+    Get.put(ReportExportService());
+    Get.put(BackupService());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(MyApp(themeService: themeService));
+    expect(find.byType(MyApp), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Advance past splash timer
+    await tester.pump(const Duration(milliseconds: 2500));
+    await tester.pump(const Duration(milliseconds: 500));
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Cancel periodic dashboard timer before exiting test
+    if (Get.isRegistered<DashboardController>()) {
+      Get.delete<DashboardController>(force: true);
+    }
   });
 }

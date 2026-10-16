@@ -1,110 +1,79 @@
-import 'package:flutter/material.dart';
+import 'dart:math';
 import 'package:get/get.dart';
-import 'package:uuid/uuid.dart';
 import '../../../core/models/product_model.dart';
-import '../../../core/models/stock_movement_model.dart';
+import '../../../core/services/database_service.dart';
 
 class ProductsController extends GetxController {
-  final RxList<Product> products = <Product>[].obs;
-  final RxList<StockMovement> movements = <StockMovement>[].obs;
-  
-  final RxBool isLoading = false.obs;
+  final DatabaseService db = Get.find<DatabaseService>();
 
-  @override
-  void onInit() {
-    super.onInit();
-    _loadDummyData();
+  final RxString searchQuery = ''.obs;
+  final RxString selectedBrandFilter = 'All'.obs;
+  final RxBool isBrandView = true.obs; // Toggle between brand grouping and flat list
+
+  // Getter for all products from DatabaseService
+  RxList<Product> get products => db.products;
+  List<Product> get lowStockProducts => db.lowStockProducts;
+  double get totalStockValue => db.totalStockValuation;
+
+  List<String> get brandList {
+    final list = ['All', ...db.allBrands];
+    return list;
   }
 
-  void _loadDummyData() {
-    products.addAll([
-      Product(
-        id: '1',
-        name: 'Wireless Earbuds',
-        sku: 'WE-001',
-        category: 'Electronics',
-        costPrice: 800,
-        sellingPrice: 1500,
-        stockQuantity: 15,
-        lowStockThreshold: 5,
-        createdAt: DateTime.now().subtract(const Duration(days: 10)),
-      ),
-      Product(
-        id: '2',
-        name: 'Phone Case',
-        sku: 'PC-002',
-        category: 'Accessories',
-        costPrice: 200,
-        sellingPrice: 500,
-        stockQuantity: 2, // Low stock
-        lowStockThreshold: 5,
-        createdAt: DateTime.now().subtract(const Duration(days: 5)),
-      ),
-    ]);
+  // Filtered products list
+  List<Product> get filteredProducts {
+    return products.where((p) {
+      final matchesSearch = searchQuery.value.isEmpty ||
+          p.brandName.toLowerCase().contains(searchQuery.value.toLowerCase()) ||
+          p.catalogName.toLowerCase().contains(searchQuery.value.toLowerCase()) ||
+          p.productCode.toLowerCase().contains(searchQuery.value.toLowerCase());
+
+      final matchesBrand = selectedBrandFilter.value == 'All' ||
+          p.brandName.toLowerCase() == selectedBrandFilter.value.toLowerCase();
+
+      return matchesSearch && matchesBrand;
+    }).toList();
   }
 
-  List<Product> get lowStockProducts => products.where((p) => p.stockQuantity <= p.lowStockThreshold).toList();
-  
-  double get totalStockValue => products.fold(0, (sum, item) => sum + (item.costPrice * item.stockQuantity));
+  // Grouped products by brand map
+  Map<String, List<Product>> get groupedByBrand {
+    final Map<String, List<Product>> grouped = {};
+    for (var p in filteredProducts) {
+      if (!grouped.containsKey(p.brandName)) {
+        grouped[p.brandName] = [];
+      }
+      grouped[p.brandName]!.add(p);
+    }
+    return grouped;
+  }
+
+  // Auto-generate Product Code (e.g. SM-4829)
+  String generateProductCode([String? brandPrefix]) {
+    final prefix = (brandPrefix != null && brandPrefix.trim().isNotEmpty)
+        ? brandPrefix.trim().substring(0, min(3, brandPrefix.trim().length)).toUpperCase()
+        : 'SM';
+    final randomNum = 1000 + Random().nextInt(9000);
+    return '$prefix-$randomNum';
+  }
 
   void addProduct(Product product) {
-    products.add(product);
-    // Add initial stock movement
-    if (product.stockQuantity > 0) {
-      movements.add(StockMovement(
-        id: const Uuid().v4(),
-        productId: product.id,
-        type: 'restock',
-        quantity: product.stockQuantity,
-        timestamp: DateTime.now(),
-      ));
-    }
+    db.addProduct(product);
     Get.back();
-    Get.snackbar('Success', 'Product added successfully', snackPosition: SnackPosition.BOTTOM);
+    Get.snackbar('Success', 'Product saved successfully', snackPosition: SnackPosition.BOTTOM);
   }
 
   void updateProduct(Product product) {
-    final index = products.indexWhere((p) => p.id == product.id);
-    if (index != -1) {
-      final oldProduct = products[index];
-      products[index] = product;
-      
-      // Track manual stock adjustment
-      if (oldProduct.stockQuantity != product.stockQuantity) {
-        final difference = product.stockQuantity - oldProduct.stockQuantity;
-        movements.add(StockMovement(
-          id: const Uuid().v4(),
-          productId: product.id,
-          type: difference > 0 ? 'restock' : 'adjustment',
-          quantity: difference,
-          timestamp: DateTime.now(),
-        ));
-      }
-      Get.back();
-      Get.snackbar('Success', 'Product updated successfully', snackPosition: SnackPosition.BOTTOM);
-    }
+    db.updateProduct(product);
+    Get.back();
+    Get.snackbar('Success', 'Product updated successfully', snackPosition: SnackPosition.BOTTOM);
   }
 
   void deleteProduct(String id) {
-    products.removeWhere((p) => p.id == id);
-    Get.snackbar('Success', 'Product deleted successfully', snackPosition: SnackPosition.BOTTOM);
+    db.deleteProduct(id);
+    Get.snackbar('Deleted', 'Product removed from inventory', snackPosition: SnackPosition.BOTTOM);
   }
 
-  void restockProduct(String id, int quantity) {
-    final index = products.indexWhere((p) => p.id == id);
-    if (index != -1 && quantity > 0) {
-      final product = products[index];
-      products[index] = product.copyWith(
-        stockQuantity: product.stockQuantity + quantity,
-      );
-      movements.add(StockMovement(
-        id: const Uuid().v4(),
-        productId: id,
-        type: 'restock',
-        quantity: quantity,
-        timestamp: DateTime.now(),
-      ));
-      Get.snackbar('Restocked', 'Added $quantity units to ${product.name}', snackPosition: SnackPosition.BOTTOM);
-    }
+  void adjustQuantity(String id, int delta) {
+    db.adjustProductQuantity(id, delta);
   }
 }
