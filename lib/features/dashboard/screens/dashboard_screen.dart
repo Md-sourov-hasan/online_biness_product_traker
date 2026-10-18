@@ -13,6 +13,7 @@ import '../../../core/utils/constants/colors.dart';
 import '../../../core/common/styles/global_text_style.dart';
 import '../../../core/common/widgets/common_background.dart';
 import '../../../routes/app_routes.dart';
+import '../../notifications/controllers/notifications_controller.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -24,7 +25,8 @@ class DashboardScreen extends StatelessWidget {
     final AuthService auth = Get.find<AuthService>();
     final PermissionService perm = Get.find<PermissionService>();
     final ThemeLanguageService themeService = Get.find<ThemeLanguageService>();
-    final BottomNavigationController nav = Get.find<BottomNavigationController>();
+    final BottomNavigationController nav =
+        Get.find<BottomNavigationController>();
 
     return CommonBackgroundScaffold(
       body: SafeArea(
@@ -35,9 +37,23 @@ class DashboardScreen extends StatelessWidget {
             if (perm.isStaff) {
               return _buildStaffDashboard(context, auth, db, themeService, nav);
             } else if (perm.isManager) {
-              return _buildManagerDashboard(context, auth, db, controller, themeService, nav);
+              return _buildManagerDashboard(
+                context,
+                auth,
+                db,
+                controller,
+                themeService,
+                nav,
+              );
             } else {
-              return _buildOwnerDashboard(context, auth, db, controller, themeService, nav);
+              return _buildOwnerDashboard(
+                context,
+                auth,
+                db,
+                controller,
+                themeService,
+                nav,
+              );
             }
           }),
         ),
@@ -90,28 +106,46 @@ class DashboardScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.w,
+                      vertical: 3.h,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8.r),
                     ),
                     child: Text(
                       'SALES & DISPATCH TERMINAL',
-                      style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w700, color: Colors.white),
+                      style: TextStyle(
+                        fontSize: 10.sp,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
-                  Icon(Icons.point_of_sale_rounded, color: Colors.white, size: 24.w),
+                  Icon(
+                    Icons.point_of_sale_rounded,
+                    color: Colors.white,
+                    size: 24.w,
+                  ),
                 ],
               ),
               12.verticalSpace,
               Text(
                 'Welcome, $userName',
-                style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: Colors.white),
+                style: TextStyle(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
               ),
               4.verticalSpace,
               Text(
                 'Ready to process customer sales and record delivery expenses.',
-                style: TextStyle(fontSize: 12.sp, color: Colors.white.withValues(alpha: 0.9)),
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  color: Colors.white.withValues(alpha: 0.9),
+                ),
               ),
             ],
           ),
@@ -121,7 +155,11 @@ class DashboardScreen extends StatelessWidget {
         // Quick Task Buttons for Staff
         Text(
           'Quick Tasks',
-          style: getTextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
+          style: getTextStyle(
+            fontSize: 16.sp,
+            fontWeight: FontWeight.w700,
+            color: themeService.textColor,
+          ),
         ),
         12.verticalSpace,
         Row(
@@ -180,7 +218,11 @@ class DashboardScreen extends StatelessWidget {
         // Available Products Quick Check (Price & Availability only - NO cost price!)
         Text(
           'Available Products & Customer Selling Prices',
-          style: getTextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
+          style: getTextStyle(
+            fontSize: 15.sp,
+            fontWeight: FontWeight.w700,
+            color: themeService.textColor,
+          ),
         ),
         10.verticalSpace,
         ListView.separated(
@@ -196,7 +238,10 @@ class DashboardScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 color: themeService.cardColor,
                 borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(color: themeService.inputBorderColor, width: 0.5),
+                border: Border.all(
+                  color: themeService.inputBorderColor,
+                  width: 0.5,
+                ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -205,18 +250,44 @@ class DashboardScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(p.displayName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: themeService.textColor)),
-                        Text('Code: ${p.productCode} • ${inStock ? "${p.quantity} pcs available" : "Out of Stock"}',
-                            style: TextStyle(fontSize: 11.sp, color: inStock ? AppColors.success : Colors.redAccent)),
+                        Text(
+                          p.displayName,
+                          style: TextStyle(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w600,
+                            color: themeService.textColor,
+                          ),
+                        ),
+                        Text(
+                          'Code: ${p.productCode} • ${inStock ? "${p.quantity} pcs available" : "Out of Stock"}',
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            color: inStock
+                                ? AppColors.success
+                                : Colors.redAccent,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('৳${p.sellingPrice.toStringAsFixed(0)}',
-                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                      Text('Selling Price', style: TextStyle(fontSize: 9.sp, color: themeService.subtextColor)),
+                      Text(
+                        '৳${p.sellingPrice.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      Text(
+                        'Selling Price',
+                        style: TextStyle(
+                          fontSize: 9.sp,
+                          color: themeService.subtextColor,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -246,7 +317,11 @@ class DashboardScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(14.r),
           border: Border.all(color: color.withValues(alpha: 0.2)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 6, offset: const Offset(0, 3)),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
+            ),
           ],
         ),
         child: Column(
@@ -261,9 +336,19 @@ class DashboardScreen extends StatelessWidget {
               child: Icon(icon, color: color, size: 22.w),
             ),
             10.verticalSpace,
-            Text(title, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: theme.textColor)),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w700,
+                color: theme.textColor,
+              ),
+            ),
             2.verticalSpace,
-            Text(subtitle, style: TextStyle(fontSize: 11.sp, color: theme.subtextColor)),
+            Text(
+              subtitle,
+              style: TextStyle(fontSize: 11.sp, color: theme.subtextColor),
+            ),
           ],
         ),
       ),
@@ -305,15 +390,38 @@ class DashboardScreen extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('OPERATIONAL INVENTORY', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: Colors.white.withValues(alpha: 0.9))),
-                  Icon(Icons.inventory_2_rounded, color: Colors.white, size: 20.w),
+                  Text(
+                    'OPERATIONAL INVENTORY',
+                    style: TextStyle(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
+                  Icon(
+                    Icons.inventory_2_rounded,
+                    color: Colors.white,
+                    size: 20.w,
+                  ),
                 ],
               ),
               10.verticalSpace,
-              Text('${db.totalStockPieces} Units in Stock', style: TextStyle(fontSize: 22.sp, fontWeight: FontWeight.w800, color: Colors.white)),
+              Text(
+                '${db.totalStockPieces} Units in Stock',
+                style: TextStyle(
+                  fontSize: 22.sp,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
               4.verticalSpace,
-              Text('Across ${db.products.length} distinct SKUs & ${db.allBrands.length} brands',
-                  style: TextStyle(fontSize: 12.sp, color: Colors.white.withValues(alpha: 0.85))),
+              Text(
+                'Across ${db.products.length} distinct SKUs & ${db.allBrands.length} brands',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  color: Colors.white.withValues(alpha: 0.85),
+                ),
+              ),
             ],
           ),
         ),
@@ -323,16 +431,18 @@ class DashboardScreen extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Obx(() => _buildRotatingMetricCard(
-                    title: controller.currentSalesLabelKey.tr,
-                    value: '৳${controller.currentPeriodSales.toStringAsFixed(0)}',
-                    subtitle: 'Operational Sales',
-                    icon: Icons.trending_up_rounded,
-                    accentColor: AppColors.primary,
-                    onTap: controller.cycleSalesRotation,
-                    themeService: themeService,
-                    tag: controller.currentSalesPeriod.toUpperCase(),
-                  )),
+              child: Obx(
+                () => _buildRotatingMetricCard(
+                  title: controller.currentSalesLabelKey.tr,
+                  value: '৳${controller.currentPeriodSales.toStringAsFixed(0)}',
+                  subtitle: 'Operational Sales',
+                  icon: Icons.trending_up_rounded,
+                  accentColor: AppColors.primary,
+                  onTap: controller.cycleSalesRotation,
+                  themeService: themeService,
+                  tag: controller.currentSalesPeriod.toUpperCase(),
+                ),
+              ),
             ),
             12.horizontalSpace,
             Expanded(
@@ -341,17 +451,35 @@ class DashboardScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: themeService.cardColor,
                   borderRadius: BorderRadius.circular(16.r),
-                  border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.receipt_long_rounded, color: AppColors.error, size: 22.w),
+                    Icon(
+                      Icons.receipt_long_rounded,
+                      color: AppColors.error,
+                      size: 22.w,
+                    ),
                     12.verticalSpace,
-                    Text('Total Expenses', style: TextStyle(fontSize: 11.sp, color: themeService.subtextColor)),
+                    Text(
+                      'Total Expenses',
+                      style: TextStyle(
+                        fontSize: 11.sp,
+                        color: themeService.subtextColor,
+                      ),
+                    ),
                     4.verticalSpace,
-                    Text('৳${db.totalExpenses.toStringAsFixed(0)}',
-                        style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: themeService.textColor)),
+                    Text(
+                      '৳${db.totalExpenses.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w800,
+                        color: themeService.textColor,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -361,16 +489,63 @@ class DashboardScreen extends StatelessWidget {
         24.verticalSpace,
 
         // Quick Actions for Manager
-        Text('Manager Quick Actions', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: themeService.textColor)),
+        Text(
+          'Manager Quick Actions',
+          style: TextStyle(
+            fontSize: 16.sp,
+            fontWeight: FontWeight.w700,
+            color: themeService.textColor,
+          ),
+        ),
         12.verticalSpace,
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(child: _buildActionItem('New Sale', Icons.point_of_sale_rounded, AppColors.primary, () => nav.changeTab(2), themeService)),
-            Expanded(child: _buildActionItem('Restock', Icons.add_shopping_cart_rounded, AppColors.secondary, () => context.push(AppRoute.purchasesExpensesScreen), themeService)),
-            Expanded(child: _buildActionItem('Add SKU', Icons.add_box_rounded, AppColors.warning, () => context.push(AppRoute.addEditProductScreen), themeService)),
-            Expanded(child: _buildActionItem('Discounts', Icons.discount_rounded, AppColors.purple, () => context.push(AppRoute.discountManagementScreen), themeService)),
-            Expanded(child: _buildActionItem('Suppliers', Icons.local_shipping_rounded, AppColors.teal, () => context.push(AppRoute.supplierManagementScreen), themeService)),
+            Expanded(
+              child: _buildActionItem(
+                'New Sale',
+                Icons.point_of_sale_rounded,
+                AppColors.primary,
+                () => nav.changeTab(2),
+                themeService,
+              ),
+            ),
+            Expanded(
+              child: _buildActionItem(
+                'Restock',
+                Icons.add_shopping_cart_rounded,
+                AppColors.secondary,
+                () => context.push(AppRoute.purchasesExpensesScreen),
+                themeService,
+              ),
+            ),
+            Expanded(
+              child: _buildActionItem(
+                'Add SKU',
+                Icons.add_box_rounded,
+                AppColors.warning,
+                () => context.push(AppRoute.addEditProductScreen),
+                themeService,
+              ),
+            ),
+            Expanded(
+              child: _buildActionItem(
+                'Discounts',
+                Icons.discount_rounded,
+                AppColors.purple,
+                () => context.push(AppRoute.discountManagementScreen),
+                themeService,
+              ),
+            ),
+            Expanded(
+              child: _buildActionItem(
+                'Suppliers',
+                Icons.local_shipping_rounded,
+                AppColors.teal,
+                () => context.push(AppRoute.supplierManagementScreen),
+                themeService,
+              ),
+            ),
           ],
         ),
         24.verticalSpace,
@@ -408,29 +583,34 @@ class DashboardScreen extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Obx(() => _buildRotatingMetricCard(
-                    title: controller.currentSalesLabelKey.tr,
-                    value: '৳${controller.currentPeriodSales.toStringAsFixed(0)}',
-                    subtitle: 'Tap to cycle',
-                    icon: Icons.trending_up_rounded,
-                    accentColor: AppColors.primary,
-                    onTap: controller.cycleSalesRotation,
-                    themeService: themeService,
-                    tag: controller.currentSalesPeriod.toUpperCase(),
-                  )),
+              child: Obx(
+                () => _buildRotatingMetricCard(
+                  title: controller.currentSalesLabelKey.tr,
+                  value: '৳${controller.currentPeriodSales.toStringAsFixed(0)}',
+                  subtitle: 'Tap to cycle',
+                  icon: Icons.trending_up_rounded,
+                  accentColor: AppColors.primary,
+                  onTap: controller.cycleSalesRotation,
+                  themeService: themeService,
+                  tag: controller.currentSalesPeriod.toUpperCase(),
+                ),
+              ),
             ),
             12.horizontalSpace,
             Expanded(
-              child: Obx(() => _buildRotatingMetricCard(
-                    title: controller.currentProfitLabelKey.tr,
-                    value: '৳${controller.currentPeriodProfit.toStringAsFixed(0)}',
-                    subtitle: 'Tap to cycle',
-                    icon: Icons.auto_graph_rounded,
-                    accentColor: AppColors.secondary,
-                    onTap: controller.cycleProfitRotation,
-                    themeService: themeService,
-                    tag: controller.currentProfitPeriod.toUpperCase(),
-                  )),
+              child: Obx(
+                () => _buildRotatingMetricCard(
+                  title: controller.currentProfitLabelKey.tr,
+                  value:
+                      '৳${controller.currentPeriodProfit.toStringAsFixed(0)}',
+                  subtitle: 'Tap to cycle',
+                  icon: Icons.auto_graph_rounded,
+                  accentColor: AppColors.secondary,
+                  onTap: controller.cycleProfitRotation,
+                  themeService: themeService,
+                  tag: controller.currentProfitPeriod.toUpperCase(),
+                ),
+              ),
             ),
           ],
         ),
@@ -497,45 +677,141 @@ class DashboardScreen extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.w,
+                      vertical: 2.h,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6.r),
                     ),
-                    child: Obx(() => Text(
-                          auth.currentUser.value?.role ?? 'Staff',
-                          style: getTextStyle(
-                            fontSize: 10.sp,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        )),
+                    child: Obx(
+                      () => Text(
+                        auth.currentUser.value?.role ?? 'Staff',
+                        style: getTextStyle(
+                          fontSize: 10.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
               4.verticalSpace,
-              Obx(() => Text(
-                    '${'welcome_back'.tr} ${auth.currentUser.value?.name ?? 'User'}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: getTextStyle(
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w500,
-                      color: themeService.subtextColor,
-                    ),
-                  )),
+              Obx(
+                () => Text(
+                  '${'welcome_back'.tr} ${auth.currentUser.value?.name ?? 'User'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: getTextStyle(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w500,
+                    color: themeService.subtextColor,
+                  ),
+                ),
+              ),
             ],
           ),
+        ),
+        8.horizontalSpace,
+        // Notification Bell Icon with Live Badge
+        Builder(
+          builder: (context) {
+            final NotificationsController notifCtrl =
+                Get.isRegistered<NotificationsController>()
+                ? Get.find<NotificationsController>()
+                : Get.put(NotificationsController());
+
+            return Obx(() {
+              final unread = notifCtrl.unreadCount;
+              return GestureDetector(
+                onTap: () => context.push(AppRoute.notificationsScreen),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(7.5.w),
+                      decoration: BoxDecoration(
+                        color: themeService.cardColor,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: unread > 0
+                              ? AppColors.warning.withValues(alpha: 0.6)
+                              : themeService.t.border,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        unread > 0
+                            ? Icons.notifications_active_rounded
+                            : Icons.notifications_none_rounded,
+                        size: 18.w,
+                        color: unread > 0
+                            ? AppColors.warning
+                            : themeService.textColor,
+                      ),
+                    ),
+                    if (unread > 0)
+                      Positioned(
+                        top: -3.h,
+                        right: -3.w,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 4.w,
+                            vertical: 1.5.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.error,
+                            borderRadius: BorderRadius.circular(10.r),
+                            border: Border.all(
+                              color: themeService.backgroundColor,
+                              width: 1.5,
+                            ),
+                          ),
+                          constraints: BoxConstraints(
+                            minWidth: 16.w,
+                            minHeight: 16.h,
+                          ),
+                          child: Center(
+                            child: Text(
+                              unread > 99 ? '99+' : '$unread',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 8.5.sp,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            });
+          },
         ),
         8.horizontalSpace,
         // Exact-Time Sync Button (Spec Section 10.2: Exact available data up to the second)
         Obx(() {
           final isSyncing = db.isSyncing.value;
-          final timeStr = DateFormat('hh:mm:ss a').format(db.lastSyncTime.value);
+          final timeStr = DateFormat(
+            'hh:mm:ss a',
+          ).format(db.lastSyncTime.value);
           return GestureDetector(
             onTap: () async {
               await db.triggerCloudSync();
-              Get.snackbar('Authoritative State Synced', 'Data synchronized up to $timeStr', snackPosition: SnackPosition.BOTTOM);
+              Get.snackbar(
+                'Authoritative State Synced',
+                'Data synchronized up to $timeStr',
+                snackPosition: SnackPosition.BOTTOM,
+              );
             },
             child: Container(
               padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
@@ -543,7 +819,9 @@ class DashboardScreen extends StatelessWidget {
                 color: themeService.cardColor,
                 borderRadius: BorderRadius.circular(20.r),
                 border: Border.all(
-                  color: isSyncing ? AppColors.warning : AppColors.secondary.withValues(alpha: 0.5),
+                  color: isSyncing
+                      ? AppColors.warning
+                      : AppColors.secondary.withValues(alpha: 0.5),
                 ),
                 boxShadow: [
                   BoxShadow(
@@ -567,7 +845,9 @@ class DashboardScreen extends StatelessWidget {
                     style: getTextStyle(
                       fontSize: 10.sp,
                       fontWeight: FontWeight.w600,
-                      color: isSyncing ? AppColors.warning : AppColors.secondary,
+                      color: isSyncing
+                          ? AppColors.warning
+                          : AppColors.secondary,
                     ),
                   ),
                 ],
@@ -624,7 +904,11 @@ class DashboardScreen extends StatelessWidget {
                           color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8.r),
                         ),
-                        child: Icon(Icons.inventory_2_rounded, color: Colors.white, size: 18.w),
+                        child: Icon(
+                          Icons.inventory_2_rounded,
+                          color: Colors.white,
+                          size: 18.w,
+                        ),
                       ),
                       8.horizontalSpace,
                       Expanded(
@@ -645,7 +929,10 @@ class DashboardScreen extends StatelessWidget {
                 GestureDetector(
                   onTap: () => nav.changeTab(1),
                   child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.w,
+                      vertical: 4.h,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12.r),
@@ -662,7 +949,11 @@ class DashboardScreen extends StatelessWidget {
                           ),
                         ),
                         4.horizontalSpace,
-                        Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 10.w),
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          color: Colors.white,
+                          size: 10.w,
+                        ),
                       ],
                     ),
                   ),
@@ -710,11 +1001,17 @@ class DashboardScreen extends StatelessWidget {
               children: [
                 Text(
                   'SKUs: $catalogCount',
-                  style: getTextStyle(fontSize: 11.sp, color: Colors.white.withValues(alpha: 0.9)),
+                  style: getTextStyle(
+                    fontSize: 11.sp,
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
                 ),
                 Text(
                   'Brands: $brandCount',
-                  style: getTextStyle(fontSize: 11.sp, color: Colors.white.withValues(alpha: 0.9)),
+                  style: getTextStyle(
+                    fontSize: 11.sp,
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
                 ),
               ],
             ),
@@ -812,7 +1109,10 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // --- Comprehensive Accounting Engine Summary (Spec Section 9) ---
-  Widget _buildComprehensiveFinancialSummary(DatabaseService db, ThemeLanguageService themeService) {
+  Widget _buildComprehensiveFinancialSummary(
+    DatabaseService db,
+    ThemeLanguageService themeService,
+  ) {
     return Obx(() {
       final grossSales = db.totalGrossSales;
       final discounts = db.totalAuthorizedDiscounts;
@@ -837,33 +1137,99 @@ class DashboardScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Financial Engine & Accounting Summary',
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: themeService.textColor)),
-                Text('Spec Section 9', style: TextStyle(fontSize: 10.sp, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                Text(
+                  'Financial Engine & Accounting Summary',
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w700,
+                    color: themeService.textColor,
+                  ),
+                ),
+                Text(
+                  'Spec Section 9',
+                  style: TextStyle(
+                    fontSize: 10.sp,
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
             12.verticalSpace,
             Row(
               children: [
-                Expanded(child: _buildFinancialItem('Net Revenue', '৳${netSales.toStringAsFixed(0)}', AppColors.primary, themeService)),
-                Container(width: 1, height: 35.h, color: themeService.inputBorderColor),
-                Expanded(child: _buildFinancialItem('COGS', '৳${cogs.toStringAsFixed(0)}', Colors.orange, themeService)),
-                Container(width: 1, height: 35.h, color: themeService.inputBorderColor),
-                Expanded(child: _buildFinancialItem('Gross Profit', '৳${grossProfit.toStringAsFixed(0)}', AppColors.secondary, themeService, isBold: true)),
-                Container(width: 1, height: 35.h, color: themeService.inputBorderColor),
-                Expanded(child: _buildFinancialItem('Net Profit', '৳${netProfit.toStringAsFixed(0)}', netProfit >= 0 ? AppColors.success : AppColors.error, themeService, isBold: true)),
+                Expanded(
+                  child: _buildFinancialItem(
+                    'Net Revenue',
+                    '৳${netSales.toStringAsFixed(0)}',
+                    AppColors.primary,
+                    themeService,
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 35.h,
+                  color: themeService.inputBorderColor,
+                ),
+                Expanded(
+                  child: _buildFinancialItem(
+                    'COGS',
+                    '৳${cogs.toStringAsFixed(0)}',
+                    Colors.orange,
+                    themeService,
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 35.h,
+                  color: themeService.inputBorderColor,
+                ),
+                Expanded(
+                  child: _buildFinancialItem(
+                    'Gross Profit',
+                    '৳${grossProfit.toStringAsFixed(0)}',
+                    AppColors.secondary,
+                    themeService,
+                    isBold: true,
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 35.h,
+                  color: themeService.inputBorderColor,
+                ),
+                Expanded(
+                  child: _buildFinancialItem(
+                    'Net Profit',
+                    '৳${netProfit.toStringAsFixed(0)}',
+                    netProfit >= 0 ? AppColors.success : AppColors.error,
+                    themeService,
+                    isBold: true,
+                  ),
+                ),
               ],
             ),
             10.verticalSpace,
-            Container(height: 1, color: themeService.inputBorderColor.withValues(alpha: 0.5)),
+            Container(
+              height: 1,
+              color: themeService.inputBorderColor.withValues(alpha: 0.5),
+            ),
             8.verticalSpace,
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Gross: ৳${grossSales.toStringAsFixed(0)}  •  Discounts: -৳${discounts.toStringAsFixed(0)}  •  OpEx: -৳${expenses.toStringAsFixed(0)}  •  Refunds: -৳${refunds.toStringAsFixed(0)}',
-                    style: TextStyle(fontSize: 10.sp, color: themeService.subtextColor)),
+                Text(
+                  'Gross: ৳${grossSales.toStringAsFixed(0)}  •  Discounts: -৳${discounts.toStringAsFixed(0)}  •  OpEx: -৳${expenses.toStringAsFixed(0)}  •  Refunds: -৳${refunds.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    fontSize: 10.sp,
+                    color: themeService.subtextColor,
+                  ),
+                ),
                 if (loanInterest > 0)
-                  Text('Loan Interest: -৳${loanInterest.toStringAsFixed(0)}', style: TextStyle(fontSize: 10.sp, color: Colors.redAccent)),
+                  Text(
+                    'Loan Interest: -৳${loanInterest.toStringAsFixed(0)}',
+                    style: TextStyle(fontSize: 10.sp, color: Colors.redAccent),
+                  ),
               ],
             ),
           ],
@@ -907,16 +1273,29 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // --- Owner Capital & Liabilities Hub (Spec Section 11, 12, 13) ---
-  Widget _buildOwnerCapitalHub(BuildContext context, DatabaseService db, ThemeLanguageService theme) {
+  Widget _buildOwnerCapitalHub(
+    BuildContext context,
+    DatabaseService db,
+    ThemeLanguageService theme,
+  ) {
     return Obx(() {
       final investors = db.investors;
-      final totalActiveCapital = investors.fold(0.0, (sum, i) => sum + db.getNetActiveCapitalForInvestor(i.id));
+      final totalActiveCapital = investors.fold(
+        0.0,
+        (sum, i) => sum + db.getNetActiveCapitalForInvestor(i.id),
+      );
 
       final loans = db.loans;
-      final totalDebt = loans.fold(0.0, (sum, l) => sum + db.getOutstandingLoanPrincipal(l.id));
+      final totalDebt = loans.fold(
+        0.0,
+        (sum, l) => sum + db.getOutstandingLoanPrincipal(l.id),
+      );
 
       final recs = db.receivables;
-      final totalReceivables = recs.fold(0.0, (sum, r) => sum + db.getOutstandingReceivablePrincipal(r.id));
+      final totalReceivables = recs.fold(
+        0.0,
+        (sum, r) => sum + db.getOutstandingReceivablePrincipal(r.id),
+      );
 
       return Container(
         padding: EdgeInsets.all(14.w),
@@ -931,9 +1310,22 @@ class DashboardScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Owner Capital, Loans & Receivables',
-                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: theme.textColor)),
-                Text('Exclusive Hub', style: TextStyle(fontSize: 10.sp, color: AppColors.primary, fontWeight: FontWeight.w700)),
+                Text(
+                  'Owner Capital, Loans & Receivables',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w700,
+                    color: theme.textColor,
+                  ),
+                ),
+                Text(
+                  'Exclusive Hub',
+                  style: TextStyle(
+                    fontSize: 10.sp,
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
             ),
             12.verticalSpace,
@@ -947,7 +1339,8 @@ class DashboardScreen extends StatelessWidget {
                     subtitle: '${investors.length} Partners',
                     color: AppColors.primary,
                     theme: theme,
-                    onTap: () => context.push(AppRoute.investorManagementScreen),
+                    onTap: () =>
+                        context.push(AppRoute.investorManagementScreen),
                   ),
                 ),
                 8.horizontalSpace,
@@ -1002,11 +1395,32 @@ class DashboardScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: color)),
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10.sp,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
             4.verticalSpace,
-            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: theme.textColor)),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w800,
+                color: theme.textColor,
+              ),
+            ),
             2.verticalSpace,
-            Text(subtitle, style: TextStyle(fontSize: 9.sp, color: theme.subtextColor)),
+            Text(
+              subtitle,
+              style: TextStyle(fontSize: 9.sp, color: theme.subtextColor),
+            ),
           ],
         ),
       ),
@@ -1024,20 +1438,84 @@ class DashboardScreen extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(child: _buildActionItem('action_new_sale'.tr, Icons.point_of_sale_rounded, AppColors.primary, () => nav.changeTab(2), themeService)),
-            Expanded(child: _buildActionItem('action_purchase'.tr, Icons.add_shopping_cart_rounded, AppColors.secondary, () => context.push(AppRoute.purchasesExpensesScreen), themeService)),
-            Expanded(child: _buildActionItem('action_add_product'.tr, Icons.add_box_rounded, AppColors.warning, () => context.push(AppRoute.addEditProductScreen), themeService)),
-            Expanded(child: _buildActionItem('action_reports'.tr, Icons.pie_chart_rounded, AppColors.purple, () => context.push(AppRoute.reportsScreen), themeService)),
+            Expanded(
+              child: _buildActionItem(
+                'action_new_sale'.tr,
+                Icons.point_of_sale_rounded,
+                AppColors.primary,
+                () => nav.changeTab(2),
+                themeService,
+              ),
+            ),
+            Expanded(
+              child: _buildActionItem(
+                'action_purchase'.tr,
+                Icons.add_shopping_cart_rounded,
+                AppColors.secondary,
+                () => context.push(AppRoute.purchasesExpensesScreen),
+                themeService,
+              ),
+            ),
+            Expanded(
+              child: _buildActionItem(
+                'action_add_product'.tr,
+                Icons.add_box_rounded,
+                AppColors.warning,
+                () => context.push(AppRoute.addEditProductScreen),
+                themeService,
+              ),
+            ),
+            Expanded(
+              child: _buildActionItem(
+                'action_reports'.tr,
+                Icons.pie_chart_rounded,
+                AppColors.purple,
+                () => context.push(AppRoute.reportsScreen),
+                themeService,
+              ),
+            ),
           ],
         ),
         12.verticalSpace,
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Expanded(child: _buildActionItem('Policies', Icons.shield_rounded, AppColors.primary, () => context.push(AppRoute.policyControlScreen), themeService)),
-            Expanded(child: _buildActionItem('Discounts', Icons.discount_rounded, AppColors.rose, () => context.push(AppRoute.discountManagementScreen), themeService)),
-            Expanded(child: _buildActionItem('Suppliers', Icons.local_shipping_rounded, AppColors.teal, () => context.push(AppRoute.supplierManagementScreen), themeService)),
-            Expanded(child: _buildActionItem('Audit Logs', Icons.history_edu_rounded, AppColors.textSecondary, () => context.push(AppRoute.activityLogsScreen), themeService)),
+            Expanded(
+              child: _buildActionItem(
+                'Policies',
+                Icons.shield_rounded,
+                AppColors.primary,
+                () => context.push(AppRoute.policyControlScreen),
+                themeService,
+              ),
+            ),
+            Expanded(
+              child: _buildActionItem(
+                'Discounts',
+                Icons.discount_rounded,
+                AppColors.rose,
+                () => context.push(AppRoute.discountManagementScreen),
+                themeService,
+              ),
+            ),
+            Expanded(
+              child: _buildActionItem(
+                'Suppliers',
+                Icons.local_shipping_rounded,
+                AppColors.teal,
+                () => context.push(AppRoute.supplierManagementScreen),
+                themeService,
+              ),
+            ),
+            Expanded(
+              child: _buildActionItem(
+                'Audit Logs',
+                Icons.history_edu_rounded,
+                AppColors.textSecondary,
+                () => context.push(AppRoute.activityLogsScreen),
+                themeService,
+              ),
+            ),
           ],
         ),
       ],
@@ -1100,25 +1578,39 @@ class DashboardScreen extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 20.w),
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: AppColors.error,
+                  size: 20.w,
+                ),
                 6.horizontalSpace,
                 Text(
                   'low_stock_alerts'.tr,
-                  style: getTextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
+                  style: getTextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w700,
+                    color: themeService.textColor,
+                  ),
                 ),
               ],
             ),
-            Obx(() => Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8.r),
+            Obx(
+              () => Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: Text(
+                  '${db.lowStockProducts.length} Items',
+                  style: getTextStyle(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.error,
                   ),
-                  child: Text(
-                    '${db.lowStockProducts.length} Items',
-                    style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: AppColors.error),
-                  ),
-                )),
+                ),
+              ),
+            ),
           ],
         ),
         10.verticalSpace,
@@ -1133,9 +1625,19 @@ class DashboardScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle_outline_rounded, color: AppColors.secondary, size: 20.w),
+                  Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: AppColors.secondary,
+                    size: 20.w,
+                  ),
                   8.horizontalSpace,
-                  Text('All inventory levels are healthy.', style: TextStyle(color: themeService.subtextColor, fontSize: 13.sp)),
+                  Text(
+                    'All inventory levels are healthy.',
+                    style: TextStyle(
+                      color: themeService.subtextColor,
+                      fontSize: 13.sp,
+                    ),
+                  ),
                 ],
               ),
             );
@@ -1152,7 +1654,9 @@ class DashboardScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: themeService.cardColor,
                   borderRadius: BorderRadius.circular(12.r),
-                  border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1161,14 +1665,32 @@ class DashboardScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(p.displayName, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: themeService.textColor)),
-                          Text('Code: ${p.productCode} • Threshold: ${p.lowStockThreshold} pcs',
-                              style: TextStyle(fontSize: 11.sp, color: themeService.subtextColor)),
+                          Text(
+                            p.displayName,
+                            style: TextStyle(
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w600,
+                              color: themeService.textColor,
+                            ),
+                          ),
+                          Text(
+                            'Code: ${p.productCode} • Threshold: ${p.lowStockThreshold} pcs',
+                            style: TextStyle(
+                              fontSize: 11.sp,
+                              color: themeService.subtextColor,
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    Text('${p.quantity} pcs left',
-                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: AppColors.error)),
+                    Text(
+                      '${p.quantity} pcs left',
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.error,
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -1180,23 +1702,39 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // --- Recent Activity Section ---
-  Widget _buildRecentActivitySection(DatabaseService db, ThemeLanguageService themeService) {
+  Widget _buildRecentActivitySection(
+    DatabaseService db,
+    ThemeLanguageService themeService,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('recent_activities'.tr, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: themeService.textColor)),
+        Text(
+          'recent_activities'.tr,
+          style: TextStyle(
+            fontSize: 16.sp,
+            fontWeight: FontWeight.w700,
+            color: themeService.textColor,
+          ),
+        ),
         12.verticalSpace,
         Obx(() {
           final logs = db.activityLogs.take(5).toList();
           if (logs.isEmpty) {
-            return Text('No recent activities.', style: TextStyle(color: themeService.subtextColor));
+            return Text(
+              'No recent activities.',
+              style: TextStyle(color: themeService.subtextColor),
+            );
           }
           return Container(
             padding: EdgeInsets.all(12.w),
             decoration: BoxDecoration(
               color: themeService.cardColor,
               borderRadius: BorderRadius.circular(14.r),
-              border: Border.all(color: themeService.inputBorderColor, width: 0.5),
+              border: Border.all(
+                color: themeService.inputBorderColor,
+                width: 0.5,
+              ),
             ),
             child: ListView.separated(
               shrinkWrap: true,
@@ -1214,16 +1752,33 @@ class DashboardScreen extends StatelessWidget {
                         color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8.r),
                       ),
-                      child: Icon(Icons.bolt_rounded, color: AppColors.primary, size: 16.w),
+                      child: Icon(
+                        Icons.bolt_rounded,
+                        color: AppColors.primary,
+                        size: 16.w,
+                      ),
                     ),
                     10.horizontalSpace,
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(log.title, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: themeService.textColor)),
+                          Text(
+                            log.title,
+                            style: TextStyle(
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w600,
+                              color: themeService.textColor,
+                            ),
+                          ),
                           2.verticalSpace,
-                          Text(log.description, style: TextStyle(fontSize: 11.sp, color: themeService.subtextColor)),
+                          Text(
+                            log.description,
+                            style: TextStyle(
+                              fontSize: 11.sp,
+                              color: themeService.subtextColor,
+                            ),
+                          ),
                         ],
                       ),
                     ),
