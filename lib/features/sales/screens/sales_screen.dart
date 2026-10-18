@@ -12,6 +12,9 @@ import '../../../core/common/widgets/common_background.dart';
 import '../../../core/utils/sizer.dart';
 import '../../../core/utils/constants/colors.dart';
 import '../../../core/common/styles/global_text_style.dart';
+import 'package:uuid/uuid.dart';
+import '../../notifications/models/notification_item.dart';
+import '../../notifications/controllers/notifications_controller.dart';
 
 class SalesScreen extends StatefulWidget {
   const SalesScreen({super.key});
@@ -220,15 +223,13 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
                   ],
                 ),
                 8.verticalSpace,
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: cart.length,
-                  separatorBuilder: (context, index) => 8.verticalSpace,
-                  itemBuilder: (context, index) {
-                    final item = cart[index];
-                    return _buildCartItemCard(item, index);
-                  },
+                Column(
+                  children: [
+                    for (int index = 0; index < cart.length; index++) ...[
+                      if (index > 0) 8.verticalSpace,
+                      _buildCartItemCard(cart[index], index),
+                    ],
+                  ],
                 ),
               ],
             );
@@ -800,7 +801,51 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
                     Get.snackbar('Exchange Completed', 'Exchange floor validated and committed.', snackPosition: SnackPosition.BOTTOM);
                   }
                 } catch (e) {
-                  Get.snackbar('Exchange Policy Rejected', e.toString().replaceAll('Exception: ', ''), snackPosition: SnackPosition.BOTTOM);
+                  final errStr = e.toString().replaceAll('Exception: ', '');
+                  Get.snackbar('Policy Blocked', errStr, snackPosition: SnackPosition.BOTTOM);
+                  try {
+                    if (Get.isRegistered<NotificationsController>()) {
+                      final notif = Get.find<NotificationsController>();
+                      final role = user?.role ?? 'Staff';
+                      final isStaff = role.toLowerCase() == 'staff';
+
+                      // STF-05: Return / exchange blocked alert to staff member
+                      if (isStaff && user?.id != null) {
+                        notif.dispatchNotification(
+                          AppNotificationItem(
+                            id: const Uuid().v4(),
+                            code: 'STF-05',
+                            title: 'Return/Exchange Blocked 🚫',
+                            message: errStr,
+                            timestamp: DateTime.now(),
+                            type: NotificationType.refund,
+                            recipientRole: 'Staff',
+                            recipientUserId: user!.id,
+                            actorUserId: user.id,
+                            isSelfConfirmation: true,
+                            priority: NotificationPriority.high,
+                          ),
+                        );
+                      }
+
+                      // RET-03: Return / exchange policy block notification to Owner
+                      notif.dispatchNotification(
+                        AppNotificationItem(
+                          id: const Uuid().v4(),
+                          code: 'RET-03',
+                          title: 'Return Blocked by Policy ⚠️',
+                          message: '$errStr Attempted by ${user?.name ?? role} ($role).',
+                          timestamp: DateTime.now(),
+                          type: NotificationType.refund,
+                          recipientRole: 'Owner',
+                          actorRole: role,
+                          actorUserId: user?.id,
+                          actorName: user?.name ?? role,
+                          priority: NotificationPriority.high,
+                        ),
+                      );
+                    }
+                  } catch (_) {}
                 }
               },
               child: const Text('Confirm'),

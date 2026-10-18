@@ -19,6 +19,7 @@ import '../features/reports/screens/analytics_screen.dart';
 import '../features/reports/screens/reports_screen.dart';
 import '../features/purchases_expenses/screens/purchases_expenses_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
+import '../features/notifications/screens/notification_settings_screen.dart';
 import '../core/models/product_model.dart';
 
 class AppRoute {
@@ -38,6 +39,7 @@ class AppRoute {
   static const String reportsScreen = "/reports";
   static const String purchasesExpensesScreen = "/purchases-expenses";
   static const String notificationsScreen = "/notifications";
+  static const String notificationSettingsScreen = "/notification-settings";
 
   // Owner & Governance Routes
   static const String investorManagementScreen = "/investors";
@@ -203,6 +205,14 @@ class AppRoute {
           context: context,
           state: state,
           child: const NotificationsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: notificationSettingsScreen,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const NotificationSettingsScreen(),
         ),
       ),
     ],

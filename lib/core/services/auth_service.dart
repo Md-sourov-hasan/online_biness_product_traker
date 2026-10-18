@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import '../models/user_model.dart';
 import 'database_service.dart';
+import '../../routes/app_routes.dart';
+import '../../features/notifications/models/notification_item.dart';
+import '../../features/notifications/controllers/notifications_controller.dart';
 
 class AuthService extends GetxService {
   static AuthService get to => Get.find<AuthService>();
@@ -75,6 +79,25 @@ class AuthService extends GetxService {
       );
       db.users.add(newUser);
       db.saveToLocal();
+
+      try {
+        if (Get.isRegistered<NotificationsController>()) {
+          Get.find<NotificationsController>().dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'USR-01',
+              title: 'New User Registration 👤',
+              message: '${newUser.name} registered and is pending Owner approval.',
+              timestamp: DateTime.now(),
+              type: NotificationType.pendingApproval,
+              priority: NotificationPriority.high,
+              recipientRole: 'Owner',
+              route: AppRoute.userManagementScreen,
+            ),
+          );
+        }
+      } catch (_) {}
+
       currentUser.value = newUser;
       isLoggedIn.value = true;
       await _prefs?.setString('sm_auth_email', newUser.email);

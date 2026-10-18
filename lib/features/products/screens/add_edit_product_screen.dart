@@ -222,6 +222,9 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
       } else {
         controller.updateProduct(newProduct);
       }
+      if (mounted) {
+        context.pop();
+      }
     }
   }
 

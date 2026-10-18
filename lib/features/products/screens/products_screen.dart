@@ -426,17 +426,17 @@ class ProductsScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              // Products inside brand
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
+              // Products inside brand (Clean Column layout without nested viewport overhead)
+              Padding(
                 padding: EdgeInsets.all(12.w),
-                itemCount: productList.length,
-                separatorBuilder: (c, i) => Divider(height: 16.h, color: themeService.inputBorderColor),
-                itemBuilder: (context, pIndex) {
-                  final product = productList[pIndex];
-                  return _buildProductRowItem(product, controller, perm, context, themeService);
-                },
+                child: Column(
+                  children: [
+                    for (int pIndex = 0; pIndex < productList.length; pIndex++) ...[
+                      if (pIndex > 0) Divider(height: 16.h, color: themeService.inputBorderColor),
+                      _buildProductRowItem(productList[pIndex], controller, perm, context, themeService),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),

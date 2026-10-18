@@ -5,23 +5,28 @@ import '../controllers/settings_controller.dart';
 import '../../../core/services/theme_language_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/permission_service.dart';
-import '../../../core/services/database_service.dart';
+import '../../../core/models/user_model.dart';
 import '../../../core/utils/constants/app_constants.dart';
 import '../../../core/utils/sizer.dart';
 import '../../../core/common/widgets/stockmate_components.dart';
 import '../../../core/theme/stockmate_theme.dart';
 import '../../../routes/app_routes.dart';
+import '../../notifications/controllers/notifications_controller.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final SettingsController controller = Get.put(SettingsController());
+    final SettingsController controller = Get.isRegistered<SettingsController>()
+        ? Get.find<SettingsController>()
+        : Get.put(SettingsController());
+    final NotificationsController notifController = Get.isRegistered<NotificationsController>()
+        ? Get.find<NotificationsController>()
+        : Get.put(NotificationsController());
     final ThemeLanguageService themeService = Get.find<ThemeLanguageService>();
     final AuthService auth = Get.find<AuthService>();
     final PermissionService perm = Get.find<PermissionService>();
-    final DatabaseService db = Get.find<DatabaseService>();
 
     return Obx(() {
       final t = themeService.t;
@@ -76,72 +81,68 @@ class MoreScreen extends StatelessWidget {
                 16.verticalSpace,
 
                 // 1. User Profile & Quick Role Switcher Card
-                _buildUserProfileCard(auth, perm, themeService),
+                _buildUserProfileCard(user, auth, perm, t),
                 20.verticalSpace,
 
                 // 2. Primary Operations & Reports (Grid of Featured Cards)
                 _buildSectionTitle('Operational Modules & Financials', t),
                 10.verticalSpace,
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Purchases & Expenses Card
-                      Expanded(
-                        child: _buildFeaturedCard(
-                          title: 'Purchases &\nExpenses',
-                          subtitle: '${db.expenses.length} Records',
-                          icon: Icons.receipt_long_rounded,
-                          accentColor: t.warning,
-                          bgColor: t.warningLight,
-                          t: t,
-                          onTap: () => context.push(AppRoute.purchasesExpensesScreen),
-                        ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Purchases & Expenses Card
+                    Expanded(
+                      child: _buildFeaturedCard(
+                        title: 'Purchases &\nExpenses',
+                        subtitle: 'Expenses & Stock In',
+                        icon: Icons.receipt_long_rounded,
+                        accentColor: t.warning,
+                        bgColor: t.warningLight,
+                        t: t,
+                        onTap: () => context.push(AppRoute.purchasesExpensesScreen),
                       ),
-                      12.horizontalSpace,
-                      // Financial Reports Card
-                      Expanded(
-                        child: _buildFeaturedCard(
-                          title: 'Reports &\nP&L Engine',
-                          subtitle: 'Full Statements',
-                          icon: Icons.analytics_rounded,
-                          accentColor: t.success,
-                          bgColor: t.successLight,
-                          t: t,
-                          onTap: () => context.push(AppRoute.reportsScreen),
-                        ),
+                    ),
+                    12.horizontalSpace,
+                    // Financial Reports Card
+                    Expanded(
+                      child: _buildFeaturedCard(
+                        title: 'Reports &\nP&L Engine',
+                        subtitle: 'Full Statements',
+                        icon: Icons.analytics_rounded,
+                        accentColor: t.success,
+                        bgColor: t.successLight,
+                        t: t,
+                        onTap: () => context.push(AppRoute.reportsScreen),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
                 12.verticalSpace,
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Business Analytics Card
-                      Expanded(
-                        child: _buildFeaturedCard(
-                          title: 'Analytics &\nTrends',
-                          subtitle: 'Annual KPIs',
-                          icon: Icons.trending_up_rounded,
-                          accentColor: t.purple,
-                          bgColor: t.purpleLight,
-                          t: t,
-                          onTap: () => context.push(AppRoute.analyticsScreen),
-                        ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Business Analytics Card
+                    Expanded(
+                      child: _buildFeaturedCard(
+                        title: 'Analytics &\nTrends',
+                        subtitle: 'Annual KPIs',
+                        icon: Icons.trending_up_rounded,
+                        accentColor: t.purple,
+                        bgColor: t.purpleLight,
+                        t: t,
+                        onTap: () => context.push(AppRoute.analyticsScreen),
                       ),
-                      12.horizontalSpace,
-                      // Appearance & Theme Card (Themes Spec Section 7.1)
-                      Expanded(
-                        child: _buildThemeFeaturedCard(
-                          themeService: themeService,
-                          t: t,
-                          onTap: () => context.push(AppRoute.themeScreen),
-                        ),
+                    ),
+                    12.horizontalSpace,
+                    // Appearance & Theme Card (Themes Spec Section 7.1)
+                    Expanded(
+                      child: _buildThemeFeaturedCard(
+                        themeService: themeService,
+                        t: t,
+                        onTap: () => context.push(AppRoute.themeScreen),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
                 24.verticalSpace,
 
@@ -190,7 +191,13 @@ class MoreScreen extends StatelessWidget {
                   24.verticalSpace,
                 ],
 
-                // 5. System Preferences (Language & Currency)
+                // 5. Notifications & Operational Alerts (Spec Section 5)
+                _buildSectionTitle('Notifications & Real-Time Alerts', t),
+                10.verticalSpace,
+                _buildNotificationCards(context, notifController, t),
+                24.verticalSpace,
+
+                // 6. System Preferences (Language & Currency)
                 _buildSectionTitle('System Preferences', t),
                 10.verticalSpace,
                 _buildPreferencesCard(controller, themeService, t),
@@ -523,6 +530,57 @@ class MoreScreen extends StatelessWidget {
     );
   }
 
+  // --- Notifications Menu Cards (Spec Section 5) ---
+  Widget _buildNotificationCards(
+    BuildContext context,
+    NotificationsController notifController,
+    ThemeTokens t,
+  ) {
+    return StockMateCard(
+      t: t,
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          _buildMenuRow(
+            icon: Icons.notifications_active_rounded,
+            title: 'Notifications Inbox',
+            subtitle: 'Real-time alerts, operational logs & confirmations',
+            color: t.accent,
+            t: t,
+            trailing: notifController.unreadCount > 0
+                ? Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                    decoration: BoxDecoration(
+                      color: t.danger.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12.r),
+                      border: Border.all(color: t.danger.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      '${notifController.unreadCount} new',
+                      style: TextStyle(
+                        fontSize: 10.sp,
+                        fontWeight: FontWeight.w700,
+                        color: t.danger,
+                      ),
+                    ),
+                  )
+                : null,
+            onTap: () => context.push(AppRoute.notificationsScreen),
+          ),
+          Divider(height: 1, color: t.border),
+          _buildMenuRow(
+            icon: Icons.tune_rounded,
+            title: 'Notification Settings',
+            subtitle: 'Role subscriptions, category toggles & quiet hours',
+            color: t.purple,
+            t: t,
+            onTap: () => context.push(AppRoute.notificationSettingsScreen),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMenuRow({
     required IconData icon,
     required String title,
@@ -530,6 +588,7 @@ class MoreScreen extends StatelessWidget {
     required Color color,
     required ThemeTokens t,
     required VoidCallback onTap,
+    Widget? trailing,
   }) {
     return Material(
       color: Colors.transparent,
@@ -573,6 +632,10 @@ class MoreScreen extends StatelessWidget {
                   ],
                 ),
               ),
+              if (trailing != null) ...[
+                trailing,
+                8.horizontalSpace,
+              ],
               Icon(Icons.arrow_forward_ios_rounded, color: t.textSec, size: 14.w),
             ],
           ),
@@ -685,15 +748,12 @@ class MoreScreen extends StatelessWidget {
 
   // --- User Profile Card ---
   Widget _buildUserProfileCard(
+    AppUser? user,
     AuthService auth,
     PermissionService perm,
-    ThemeLanguageService themeService,
+    ThemeTokens t,
   ) {
-    return Obx(() {
-      final t = themeService.t;
-      final user = auth.currentUser.value;
-
-      return Container(
+    return Container(
         padding: EdgeInsets.all(16.w),
         decoration: BoxDecoration(
           color: t.card,
@@ -817,7 +877,6 @@ class MoreScreen extends StatelessWidget {
           ],
         ),
       );
-    });
   }
 
   Widget _buildRoleChip(String label, String roleValue, bool isSelected, VoidCallback onTap, ThemeTokens t) {

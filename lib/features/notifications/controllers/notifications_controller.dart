@@ -1,10 +1,15 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
+import '../../../core/models/user_model.dart';
 import '../../../core/services/database_service.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../routes/app_routes.dart';
 import '../models/notification_item.dart';
+import '../models/notification_settings_model.dart';
 
 class NotificationsController extends GetxController {
   static NotificationsController get to => Get.find<NotificationsController>();
@@ -12,219 +17,533 @@ class NotificationsController extends GetxController {
   final DatabaseService _db = Get.find<DatabaseService>();
   final AuthService _auth = Get.find<AuthService>();
 
-  final RxList<AppNotificationItem> notifications = <AppNotificationItem>[].obs;
-  final RxSet<String> readNotificationIds = <String>{}.obs;
-  final RxSet<String> dismissedNotificationIds = <String>{}.obs;
+  final RxList<AppNotificationItem> allNotifications = <AppNotificationItem>[].obs;
+  final Rx<NotificationSettingsModel> settings = NotificationSettingsModel().obs;
   final RxString selectedFilter = 'all'.obs; // 'all', 'alerts', 'pending', 'activity'
 
-  static const String _readKey = 'sm_read_notification_ids';
-  static const String _dismissedKey = 'sm_dismissed_notification_ids';
+  static const String _notificationsStorageKey = 'sm_persisted_notifications_v2';
+  static const String _settingsPrefix = 'sm_notif_settings_';
 
   @override
   void onInit() {
     super.onInit();
-    _loadPersistedState();
-    _buildNotifications();
+    _loadState();
 
-    // Rebuild when underlying reactive stores update
-    ever(_db.products, (_) => _buildNotifications());
-    ever(_db.users, (_) => _buildNotifications());
-    ever(_db.receivables, (_) => _buildNotifications());
-    ever(_db.activityLogs, (_) => _buildNotifications());
-    ever(_auth.currentUser, (_) => _buildNotifications());
+    // Rebuild/refresh when auth user or underlying DB updates
+    ever(_auth.currentUser, (user) {
+      _loadSettingsForUser(user);
+    });
+
+    ever(_db.products, (_) => _syncSystemAlerts());
+    ever(_db.users, (_) => _syncSystemAlerts());
+    ever(_db.receivables, (_) => _syncSystemAlerts());
+    ever(_db.loans, (_) => _syncSystemAlerts());
   }
 
-  Future<void> _loadPersistedState() async {
+  Future<void> _loadState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final readList = prefs.getStringList(_readKey) ?? [];
-      readNotificationIds.assignAll(readList);
+      final storedJson = prefs.getString(_notificationsStorageKey);
 
-      final dismissedList = prefs.getStringList(_dismissedKey) ?? [];
-      dismissedNotificationIds.assignAll(dismissedList);
-      _buildNotifications();
+      if (storedJson != null && storedJson.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(storedJson);
+        final items = list.map((m) => AppNotificationItem.fromMap(m as Map<String, dynamic>)).toList();
+        allNotifications.assignAll(items);
+      } else {
+        _seedInitialNotifications();
+      }
+
+      await _loadSettingsForUser(_auth.currentUser.value);
     } catch (e) {
-      debugPrint('Error loading notification state: $e');
+      debugPrint('Error loading notifications state: $e');
+      _seedInitialNotifications();
     }
   }
 
-  Future<void> _persistState() async {
+  Future<void> _loadSettingsForUser(AppUser? user) async {
+    if (user == null) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(_readKey, readNotificationIds.toList());
-      await prefs.setStringList(_dismissedKey, dismissedNotificationIds.toList());
+      final key = '$_settingsPrefix${user.id}';
+      final jsonStr = prefs.getString(key);
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        settings.value = NotificationSettingsModel.fromJson(jsonStr);
+      } else {
+        settings.value = NotificationSettingsModel();
+      }
     } catch (e) {
-      debugPrint('Error saving notification state: $e');
+      debugPrint('Error loading user settings: $e');
+      settings.value = NotificationSettingsModel();
     }
   }
 
-  void _buildNotifications() {
-    final List<AppNotificationItem> items = [];
-
-    // 1. Low Stock Alerts
-    for (final product in _db.products) {
-      if (product.quantity <= product.lowStockThreshold) {
-        final notifId = 'low_stock_${product.id}_${product.quantity}';
-        if (!dismissedNotificationIds.contains(notifId)) {
-          final isZero = product.quantity <= 0;
-          items.add(
-            AppNotificationItem(
-              id: notifId,
-              title: isZero ? 'Out of Stock! 🚨' : 'Low Stock Warning ⚠️',
-              message: '${product.name} (${product.brandName}) only has ${product.quantity} units left (Threshold: ${product.lowStockThreshold}). Please restock.',
-              timestamp: DateTime.now().subtract(Duration(minutes: (product.quantity + 1) * 3)),
-              type: NotificationType.lowStock,
-              priority: isZero ? NotificationPriority.high : NotificationPriority.medium,
-              route: AppRoute.addEditProductScreen,
-              routeExtra: product,
-              isRead: readNotificationIds.contains(notifId),
-            ),
-          );
-        }
-      }
+  Future<void> saveSettings() async {
+    final user = _auth.currentUser.value;
+    if (user == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = '$_settingsPrefix${user.id}';
+      await prefs.setString(key, settings.value.toJson());
+    } catch (e) {
+      debugPrint('Error saving settings: $e');
     }
+  }
 
-    // 2. Pending User Approvals (Owner/Admin)
-    if (_auth.currentUser.value?.isOwner ?? true) {
-      final pendingUsers = _db.users.where((u) => u.approvalStatus == 'pending').toList();
-      for (final user in pendingUsers) {
-        final notifId = 'pending_user_${user.id}';
-        if (!dismissedNotificationIds.contains(notifId)) {
-          items.add(
-            AppNotificationItem(
-              id: notifId,
-              title: 'Pending Staff Approval 👤',
-              message: '${user.name} (${user.email}) requested ${user.role} role access. Tap to review.',
-              timestamp: DateTime.now().subtract(const Duration(minutes: 15)),
-              type: NotificationType.pendingApproval,
-              priority: NotificationPriority.high,
-              route: AppRoute.userManagementScreen,
-              isRead: readNotificationIds.contains(notifId),
-            ),
-          );
-        }
-      }
+  Future<void> _persistNotifications() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = allNotifications.map((n) => n.toMap()).toList();
+      await prefs.setString(_notificationsStorageKey, jsonEncode(list));
+    } catch (e) {
+      debugPrint('Error saving notifications: $e');
     }
+  }
 
-    // 3. Receivables & Overdue Debt Alert
+  void _seedInitialNotifications() {
     final now = DateTime.now();
-    for (final rec in _db.receivables) {
-      final isOverdue = now.isAfter(rec.dueDate) && rec.status != 'returned';
-      final isUpcoming = rec.dueDate.difference(now).inDays <= 3 && rec.status != 'returned';
+    final items = [
+      // USR-01: Account waiting approval (Owner only)
+      AppNotificationItem(
+        id: 'init_usr_01',
+        code: 'USR-01',
+        title: 'New Account Waiting Approval 👤',
+        message: 'Kawsar Ahmed requested Staff access from Mobile Terminal #2.',
+        timestamp: now.subtract(const Duration(minutes: 18)),
+        type: NotificationType.pendingApproval,
+        priority: NotificationPriority.high,
+        route: AppRoute.userManagementScreen,
+        recipientRole: 'Owner',
+        actorName: 'Kawsar Ahmed',
+        actorRole: 'Staff',
+      ),
+      // SAL-01 / STF-01: Staff sale completed
+      AppNotificationItem(
+        id: 'init_sal_01',
+        code: 'SAL-01',
+        title: 'New Sale Completed 🛍️',
+        message: 'Staff member Tanvir processed a sale of 2 items totaling ৳1,450.',
+        timestamp: now.subtract(const Duration(hours: 1, minutes: 12)),
+        type: NotificationType.sale,
+        priority: NotificationPriority.low,
+        route: AppRoute.bottomNavigationScreen,
+        actorUserId: 'staff_tanvir',
+        actorRole: 'Staff',
+        actorName: 'Tanvir',
+        recipientRole: 'Owner', // Also visible to Manager
+        metadata: {'profit': 420.0, 'items': 2, 'total': 1450.0},
+      ),
+      // STF-01: Staff confirmation for Tanvir
+      AppNotificationItem(
+        id: 'init_stf_01',
+        code: 'STF-01',
+        title: 'Sale Successfully Saved ✅',
+        message: 'Your sale of 2 items totaling ৳1,450 was recorded.',
+        timestamp: now.subtract(const Duration(hours: 1, minutes: 12)),
+        type: NotificationType.sale,
+        priority: NotificationPriority.low,
+        recipientRole: 'Staff',
+        recipientUserId: 'staff_1',
+        actorUserId: 'staff_1',
+        isSelfConfirmation: true,
+      ),
+      // STK-01: Low stock alert
+      AppNotificationItem(
+        id: 'init_stk_01',
+        code: 'STK-01',
+        title: 'Low Stock Alert ⚠️',
+        message: 'Premium Wireless Mouse is below threshold (4 units remaining).',
+        timestamp: now.subtract(const Duration(hours: 3)),
+        type: NotificationType.lowStock,
+        priority: NotificationPriority.medium,
+        route: AppRoute.addEditProductScreen,
+        recipientRole: 'all',
+      ),
+      // MNY-01: Loan payment due (Owner only)
+      AppNotificationItem(
+        id: 'init_mny_01',
+        code: 'MNY-01',
+        title: 'Loan Installment Due Soon 🏦',
+        message: 'Commercial Bank installment of ৳15,000 is due in 3 days.',
+        timestamp: now.subtract(const Duration(hours: 5)),
+        type: NotificationType.money,
+        priority: NotificationPriority.high,
+        route: AppRoute.loanManagementScreen,
+        recipientRole: 'Owner',
+      ),
+      // DSC-01: Discount request from Manager (Owner only)
+      AppNotificationItem(
+        id: 'init_dsc_01',
+        code: 'DSC-01',
+        title: 'Discount Approval Requested 🏷️',
+        message: 'Manager requested a 12% Flash Promo discount on Electronics.',
+        timestamp: now.subtract(const Duration(hours: 6)),
+        type: NotificationType.discount,
+        priority: NotificationPriority.high,
+        route: AppRoute.discountManagementScreen,
+        recipientRole: 'Owner',
+        actorRole: 'Manager',
+        actorName: 'Store Manager',
+      ),
+    ];
 
-      if (isOverdue || isUpcoming) {
-        final notifId = 'receivable_${rec.id}';
-        if (!dismissedNotificationIds.contains(notifId)) {
-          items.add(
-            AppNotificationItem(
-              id: notifId,
-              title: isOverdue ? 'Overdue Receivable Due! ⏱️' : 'Payment Due Soon 💳',
-              message: '${rec.borrower} owes ৳${rec.amountLent.toStringAsFixed(1)} (Purpose: ${rec.purpose.isEmpty ? "General" : rec.purpose}).',
-              timestamp: rec.dueDate,
-              type: NotificationType.receivableDue,
-              priority: isOverdue ? NotificationPriority.high : NotificationPriority.medium,
-              route: AppRoute.moneyLentScreen,
-              isRead: readNotificationIds.contains(notifId),
-            ),
-          );
-        }
-      }
-    }
-
-    // 4. Critical & Recent Activity Logs (Sales, large refunds, policy updates)
-    final recentLogs = _db.activityLogs.take(10);
-    for (final log in recentLogs) {
-      final notifId = 'activity_${log.id}';
-      if (!dismissedNotificationIds.contains(notifId)) {
-        NotificationType notifType = NotificationType.activityLog;
-        NotificationPriority priority = NotificationPriority.low;
-
-        if (log.type.toLowerCase().contains('sale')) {
-          notifType = NotificationType.sale;
-        } else if (log.type.toLowerCase().contains('purchase')) {
-          notifType = NotificationType.purchase;
-        } else if (log.title.toLowerCase().contains('refund') || log.title.toLowerCase().contains('delete')) {
-          priority = NotificationPriority.medium;
-        }
-
-        items.add(
-          AppNotificationItem(
-            id: notifId,
-            title: log.title,
-            message: '${log.description}${log.performedBy != null ? " • by ${log.performedBy}" : ""}',
-            timestamp: log.timestamp,
-            type: notifType,
-            priority: priority,
-            route: AppRoute.activityLogsScreen,
-            isRead: readNotificationIds.contains(notifId),
-          ),
-        );
-      }
-    }
-
-    // Sort by timestamp descending
-    items.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    notifications.assignAll(items);
+    allNotifications.assignAll(items);
+    _persistNotifications();
   }
 
-  int get unreadCount => notifications.where((n) => !n.isRead).length;
+  // ---------------------------------------------------------------------------
+  // Central Shared Recipient Determination (Specification Section 1 & Section 6)
+  // ---------------------------------------------------------------------------
+  static bool isNotificationForUser({
+    required AppNotificationItem item,
+    required AppUser? user,
+    required NotificationSettingsModel currentSettings,
+  }) {
+    if (user == null) return false;
 
-  List<AppNotificationItem> get filteredNotifications {
-    final filter = selectedFilter.value;
-    if (filter == 'alerts') {
-      return notifications
-          .where((n) => n.type == NotificationType.lowStock || n.type == NotificationType.receivableDue)
-          .toList();
-    } else if (filter == 'pending') {
-      return notifications
-          .where((n) => n.type == NotificationType.pendingApproval)
-          .toList();
-    } else if (filter == 'activity') {
-      return notifications
-          .where((n) =>
-              n.type == NotificationType.sale ||
-              n.type == NotificationType.system ||
-              n.type == NotificationType.purchase ||
-              n.type == NotificationType.activityLog)
-          .toList();
+    // 1. Specific recipient user check
+    if (item.recipientUserId != null &&
+        item.recipientUserId!.isNotEmpty &&
+        item.recipientUserId != user.id) {
+      return false;
     }
-    return notifications;
+
+    // 2. Suppress own actions unless it is a designated confirmation alert
+    if (item.actorUserId != null &&
+        item.actorUserId == user.id &&
+        !item.isSelfConfirmation) {
+      return false;
+    }
+
+    // 3. STAFF User Rules (Spec Section 4)
+    // "Staff must not see profit, purchase cost, loans, investors or other people's entries."
+    if (user.isStaff) {
+      // Must be a Staff specific code or targeted directly to this staff user
+      final isStaffCode = item.code.startsWith('STF-');
+      final isTargetedToStaff = item.recipientRole == 'Staff' || item.recipientUserId == user.id;
+
+      if (!isStaffCode && !isTargetedToStaff) {
+        return false;
+      }
+
+      if (!currentSettings.staffMasterSwitch) {
+        // Allow critical in-app blocks (STF-05, STF-07), mute optional inbox notifications
+        if (item.code != 'STF-05' && item.code != 'STF-07') {
+          return false;
+        }
+      }
+
+      if (item.code == 'STF-06' && !currentSettings.endOfDayReminder) {
+        return false;
+      }
+
+      return true;
+    }
+
+    // 4. MANAGER User Rules (Spec Section 3)
+    // "The Manager does not receive Owner actions, loans, money lent, investor changes, policy changes, user/device approvals, daily summaries or backup reminders."
+    if (user.isManager) {
+      // Always on: Discount request result (DSC-02)
+      if (item.code == 'DSC-02') {
+        return true;
+      }
+
+      // Manager's own confirmation alerts
+      if (item.isSelfConfirmation && item.actorUserId == user.id) {
+        return currentSettings.myActions;
+      }
+
+      // Stock alerts (STK-01, STK-02)
+      if (item.code == 'STK-01' || item.code == 'STK-02') {
+        return currentSettings.stockAlerts;
+      }
+
+      // Staff sale alerts (SAL-01, SAL-04, SAL-05) - only if performed by Staff
+      if ((item.code == 'SAL-01' || item.code == 'SAL-04' || item.code == 'SAL-05') &&
+          item.actorRole?.toLowerCase() == 'staff') {
+        return currentSettings.staffSalesAndReturns;
+      }
+
+      // Staff returns/exchanges (RET-01, RET-02, RET-03) - only if performed by Staff
+      if ((item.code == 'RET-01' || item.code == 'RET-02' || item.code == 'RET-03') &&
+          item.actorRole?.toLowerCase() == 'staff') {
+        return currentSettings.staffSalesAndReturns;
+      }
+
+      // Staff expenses (EXP-01, EXP-02) - only if submitted by Staff
+      if ((item.code == 'EXP-01' || item.code == 'EXP-02') &&
+          item.actorRole?.toLowerCase() == 'staff') {
+        return currentSettings.staffExpenses;
+      }
+
+      // All other notifications are forbidden for Manager
+      return false;
+    }
+
+    // 5. OWNER User Rules (Spec Section 2)
+    if (user.isOwner) {
+      // Staff-only codes (STF-*) and Manager discount result (DSC-02) are not for Owner
+      if (item.code.startsWith('STF-') || item.code == 'DSC-02') {
+        return false;
+      }
+
+      if (!currentSettings.masterSwitch) {
+        // Pending approvals remain visible
+        if (item.code == 'USR-01') return true;
+        return false;
+      }
+
+      // Recipient filter evaluation
+      final filter = currentSettings.recipientFilter;
+      if (filter == 'manager_only' && item.actorRole?.toLowerCase() == 'staff') {
+        return false;
+      }
+      if (filter == 'staff_only' && item.actorRole?.toLowerCase() == 'manager') {
+        return false;
+      }
+
+      // Category filter switches
+      if (item.code.startsWith('SAL-') || item.code.startsWith('RET-')) {
+        return currentSettings.salesAndReturns;
+      }
+      if (item.code.startsWith('EXP-')) {
+        return currentSettings.expenses;
+      }
+      if (item.code.startsWith('STK-') || item.code.startsWith('SUP-')) {
+        return currentSettings.stockAndSuppliers;
+      }
+      if (item.code.startsWith('MNY-')) {
+        return currentSettings.moneyRecords;
+      }
+      if (item.code == 'USR-01') {
+        return currentSettings.usersAndSecurity;
+      }
+      if (item.code.startsWith('SYS-') || item.code == 'DSC-01') {
+        return currentSettings.reportsAndSystem;
+      }
+
+      return true;
+    }
+
+    return false;
   }
 
+  // Filtered notification list for currently active user
+  List<AppNotificationItem> get currentUserNotifications {
+    final user = _auth.currentUser.value;
+    final userSettings = settings.value;
+
+    final list = allNotifications.where((n) {
+      if (n.isDismissed) return false;
+      return isNotificationForUser(
+        item: n,
+        user: user,
+        currentSettings: userSettings,
+      );
+    }).toList();
+
+    // Tab filter
+    final tab = selectedFilter.value;
+    if (tab == 'alerts') {
+      return list.where((n) =>
+          n.priority == NotificationPriority.high ||
+          n.type == NotificationType.lowStock ||
+          n.type == NotificationType.receivableDue ||
+          n.code == 'SAL-04' ||
+          n.code == 'SAL-05' ||
+          n.code == 'STF-07').toList();
+    } else if (tab == 'pending') {
+      return list.where((n) =>
+          n.type == NotificationType.pendingApproval ||
+          n.code == 'USR-01' ||
+          n.code == 'DSC-01').toList();
+    } else if (tab == 'activity') {
+      return list.where((n) =>
+          n.type == NotificationType.sale ||
+          n.type == NotificationType.purchase ||
+          n.type == NotificationType.expense ||
+          n.type == NotificationType.refund ||
+          n.type == NotificationType.exchange).toList();
+    }
+
+    return list;
+  }
+
+  int get unreadCount => currentUserNotifications.where((n) => !n.isRead).length;
+
+  // ---------------------------------------------------------------------------
+  // Central Dispatcher Function (Triggering Push + Inbox)
+  // ---------------------------------------------------------------------------
+  void dispatchNotification(AppNotificationItem item) {
+    allNotifications.insert(0, item);
+    _persistNotifications();
+
+    // Check if current user is an eligible recipient for active push/banner
+    final user = _auth.currentUser.value;
+    final isEligible = isNotificationForUser(
+      item: item,
+      user: user,
+      currentSettings: settings.value,
+    );
+
+    if (isEligible) {
+      // Local push delivery
+      if (item.delivery == 'push_inbox' || item.priority == NotificationPriority.high) {
+        try {
+          if (Get.isRegistered<NotificationService>()) {
+            Get.find<NotificationService>().showPushNotification(
+              id: item.hashCode,
+              title: item.title,
+              body: item.message,
+              payload: item.route,
+            );
+          }
+        } catch (_) {}
+      }
+
+      // In-app immediate feedback
+      Get.snackbar(
+        item.title,
+        item.message,
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.black.withValues(alpha: 0.85),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(12),
+        borderRadius: 12,
+        icon: Icon(
+          item.priority == NotificationPriority.high
+              ? Icons.warning_amber_rounded
+              : Icons.notifications_active_rounded,
+          color: Colors.amberAccent,
+        ),
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Inbox Actions (Spec Section 5: mark one read, mark all read, dismiss one, clear all)
+  // ---------------------------------------------------------------------------
   void markAsRead(String id) {
-    readNotificationIds.add(id);
-    final index = notifications.indexWhere((n) => n.id == id);
-    if (index != -1) {
-      notifications[index].isRead = true;
-      notifications.refresh();
+    final idx = allNotifications.indexWhere((n) => n.id == id);
+    if (idx != -1) {
+      allNotifications[idx].isRead = true;
+      allNotifications.refresh();
+      _persistNotifications();
     }
-    _persistState();
   }
 
   void markAllAsRead() {
-    for (final notif in notifications) {
-      readNotificationIds.add(notif.id);
-      notif.isRead = true;
+    final user = _auth.currentUser.value;
+    final userSettings = settings.value;
+
+    for (final notif in allNotifications) {
+      if (isNotificationForUser(item: notif, user: user, currentSettings: userSettings)) {
+        notif.isRead = true;
+      }
     }
-    notifications.refresh();
-    _persistState();
+    allNotifications.refresh();
+    _persistNotifications();
   }
 
   void dismissNotification(String id) {
-    dismissedNotificationIds.add(id);
-    notifications.removeWhere((n) => n.id == id);
-    _persistState();
+    final idx = allNotifications.indexWhere((n) => n.id == id);
+    if (idx != -1) {
+      allNotifications[idx].isDismissed = true;
+      allNotifications.refresh();
+      _persistNotifications();
+    }
   }
 
   void clearAll() {
-    for (final notif in notifications) {
-      dismissedNotificationIds.add(notif.id);
+    final user = _auth.currentUser.value;
+    final userSettings = settings.value;
+
+    for (final notif in allNotifications) {
+      if (isNotificationForUser(item: notif, user: user, currentSettings: userSettings)) {
+        notif.isDismissed = true;
+      }
     }
-    notifications.clear();
-    _persistState();
+    allNotifications.refresh();
+    _persistNotifications();
+  }
+
+  // Send interactive Test Notification (Spec Section 5)
+  void sendTestNotification() {
+    final user = _auth.currentUser.value;
+
+    if (user?.isStaff ?? false) {
+      dispatchNotification(
+        AppNotificationItem(
+          id: const Uuid().v4(),
+          code: 'STF-01',
+          title: 'Test: Sale Saved Successfully ✅',
+          message: 'Your simulated order has been recorded into the terminal.',
+          timestamp: DateTime.now(),
+          type: NotificationType.sale,
+          recipientRole: 'Staff',
+          recipientUserId: user!.id,
+          actorUserId: user.id,
+          isSelfConfirmation: true,
+        ),
+      );
+    } else if (user?.isManager ?? false) {
+      dispatchNotification(
+        AppNotificationItem(
+          id: const Uuid().v4(),
+          code: 'SAL-01',
+          title: 'Test: Staff Sale Alert 🛍️',
+          message: 'Staff Tanvir sold 3 items totaling ৳2,800 (Profit: ৳750).',
+          timestamp: DateTime.now(),
+          type: NotificationType.sale,
+          actorRole: 'Staff',
+          actorName: 'Tanvir',
+          metadata: {'profit': 750.0, 'items': 3, 'total': 2800.0},
+        ),
+      );
+    } else {
+      dispatchNotification(
+        AppNotificationItem(
+          id: const Uuid().v4(),
+          code: 'SYS-01',
+          title: 'Test: Daily Operations Summary 📊',
+          message: 'Sales: ৳42,500 • Gross Profit: ৳14,200 • Net: ৳9,800.',
+          timestamp: DateTime.now(),
+          type: NotificationType.system,
+          recipientRole: 'Owner',
+        ),
+      );
+    }
+  }
+
+  void _syncSystemAlerts() {
+    // Dynamically check for out-of-stock items and generate STK-01 / STK-02 if not already present
+    for (final product in _db.products) {
+      if (product.quantity <= 0) {
+        final alertId = 'stk_zero_${product.id}';
+        final exists = allNotifications.any((n) => n.id == alertId);
+        if (!exists) {
+          allNotifications.insert(
+            0,
+            AppNotificationItem(
+              id: alertId,
+              code: 'STK-02',
+              title: 'Out of Stock Alert! 🚨',
+              message: '${product.displayName} has 0 units remaining. Reorder now.',
+              timestamp: DateTime.now(),
+              type: NotificationType.lowStock,
+              priority: NotificationPriority.high,
+              route: AppRoute.addEditProductScreen,
+              routeExtra: product,
+              recipientRole: 'all',
+            ),
+          );
+        }
+      }
+    }
   }
 
   void refreshAll() {
-    _buildNotifications();
+    _syncSystemAlerts();
+    allNotifications.refresh();
   }
 }

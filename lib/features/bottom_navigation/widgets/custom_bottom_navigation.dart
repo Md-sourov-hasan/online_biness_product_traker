@@ -23,11 +23,9 @@ class CustomBottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeLanguageService themeService = Get.find<ThemeLanguageService>();
+    final t = themeService.t;
 
-    return Obx(() {
-      final t = themeService.t;
-
-      return SafeArea(
+    return SafeArea(
         top: false,
         child: Container(
           margin: EdgeInsets.fromLTRB(16.w, 0, 16.w, 12.h),
@@ -116,7 +114,6 @@ class CustomBottomNavBar extends StatelessWidget {
           ),
         ),
       );
-    });
   }
 }
 

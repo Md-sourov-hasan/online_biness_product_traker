@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/models/product_model.dart';
 import '../../../core/models/sale_model.dart';
 import '../../../core/models/discount_rule_model.dart';
 import '../../../core/services/database_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/permission_service.dart';
+import '../../notifications/controllers/notifications_controller.dart';
+import '../../notifications/models/notification_item.dart';
 
 class SalesController extends GetxController {
   final DatabaseService db = Get.find<DatabaseService>();
@@ -201,7 +204,88 @@ class SalesController extends GetxController {
       );
       return true;
     } catch (e) {
-      Get.snackbar('Checkout Error', e.toString().replaceAll('Exception: ', ''), snackPosition: SnackPosition.BOTTOM);
+      final errorMsg = e.toString().replaceAll('Exception: ', '');
+      final user = auth.currentUser.value;
+
+      if (Get.isRegistered<NotificationsController>()) {
+        final notifCtrl = Get.find<NotificationsController>();
+
+        if (errorMsg.contains('Price Policy Violation')) {
+          // SAL-04: Sale blocked by price floor (to Owner, and to Manager if Staff attempted)
+          notifCtrl.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'SAL-04',
+              title: 'Sale Blocked: Price Floor Policy 🚫',
+              message: '${user?.name ?? "Staff"} attempted a sale below the minimum price floor: $errorMsg',
+              timestamp: DateTime.now(),
+              type: NotificationType.sale,
+              priority: NotificationPriority.high,
+              actorUserId: user?.id,
+              actorRole: user?.role,
+              actorName: user?.name,
+              recipientRole: 'Owner',
+            ),
+          );
+
+          if (user?.isStaff ?? false) {
+            // STF-07: Sale blocked by Owner rule (to Staff)
+            notifCtrl.dispatchNotification(
+              AppNotificationItem(
+                id: const Uuid().v4(),
+                code: 'STF-07',
+                title: 'Sale Blocked by Owner Rule ⚠️',
+                message: 'This sale was not saved because the unit price is below the Owner’s configured minimum price floor.',
+                timestamp: DateTime.now(),
+                type: NotificationType.sale,
+                priority: NotificationPriority.high,
+                recipientRole: 'Staff',
+                recipientUserId: user!.id,
+                actorUserId: user.id,
+                isSelfConfirmation: true,
+              ),
+            );
+          }
+        } else if (errorMsg.contains('Transaction Limit Exceeded')) {
+          // SAL-05: Sale limit reached (to Owner, and to Manager if Staff attempted)
+          notifCtrl.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'SAL-05',
+              title: 'Sale Limit Reached ⚠️',
+              message: '${user?.name ?? "Staff"} sale exceeded limit: $errorMsg',
+              timestamp: DateTime.now(),
+              type: NotificationType.sale,
+              priority: NotificationPriority.high,
+              actorUserId: user?.id,
+              actorRole: user?.role,
+              actorName: user?.name,
+              recipientRole: 'Owner',
+            ),
+          );
+
+          if (user?.isStaff ?? false) {
+            // STF-07: Sale blocked by Owner rule (to Staff)
+            notifCtrl.dispatchNotification(
+              AppNotificationItem(
+                id: const Uuid().v4(),
+                code: 'STF-07',
+                title: 'Sale Blocked: Limit Reached ⚠️',
+                message: 'This sale exceeds the allowed units or distinct products limit configured by the Owner.',
+                timestamp: DateTime.now(),
+                type: NotificationType.sale,
+                priority: NotificationPriority.high,
+                recipientRole: 'Staff',
+                recipientUserId: user!.id,
+                actorUserId: user.id,
+                isSelfConfirmation: true,
+              ),
+            );
+          }
+        }
+      }
+
+      Get.snackbar('Checkout Error', errorMsg, snackPosition: SnackPosition.BOTTOM);
       return false;
     }
   }

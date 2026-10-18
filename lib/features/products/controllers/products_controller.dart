@@ -58,13 +58,11 @@ class ProductsController extends GetxController {
 
   void addProduct(Product product) {
     db.addProduct(product);
-    Get.back();
     Get.snackbar('Success', 'Product saved successfully', snackPosition: SnackPosition.BOTTOM);
   }
 
   void updateProduct(Product product) {
     db.updateProduct(product);
-    Get.back();
     Get.snackbar('Success', 'Product updated successfully', snackPosition: SnackPosition.BOTTOM);
   }
 

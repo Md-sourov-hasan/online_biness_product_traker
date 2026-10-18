@@ -37,25 +37,23 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      return GetMaterialApp.router(
-        title: 'StockMate',
-        debugShowCheckedModeBanner: false,
-        translations: AppTranslations(),
-        locale: themeService.currentLocale.value,
-        fallbackLocale: const Locale('en', 'US'),
-        theme: themeService.themeData,
-        scrollBehavior: const MaterialScrollBehavior().copyWith(
-          physics: const BouncingScrollPhysics(),
-        ),
-        builder: (context, child) {
-          Sizer.init(context);
-          return child!;
-        },
-        routeInformationProvider: AppRoute.router.routeInformationProvider,
-        routeInformationParser: AppRoute.router.routeInformationParser,
-        routerDelegate: AppRoute.router.routerDelegate,
-      );
-    });
+    return GetMaterialApp.router(
+      title: 'StockMate',
+      debugShowCheckedModeBanner: false,
+      translations: AppTranslations(),
+      locale: themeService.currentLocale.value,
+      fallbackLocale: const Locale('en', 'US'),
+      theme: themeService.themeData,
+      scrollBehavior: const MaterialScrollBehavior().copyWith(
+        physics: const BouncingScrollPhysics(),
+      ),
+      builder: (context, child) {
+        Sizer.init(context);
+        return child!;
+      },
+      routeInformationProvider: AppRoute.router.routeInformationProvider,
+      routeInformationParser: AppRoute.router.routeInformationParser,
+      routerDelegate: AppRoute.router.routerDelegate,
+    );
   }
 }

@@ -20,11 +20,13 @@ class NotificationService extends GetxService {
 
       const DarwinInitializationSettings initializationSettingsDarwin =
           DarwinInitializationSettings(
-              requestAlertPermission: true,
-              requestBadgePermission: true,
-              requestSoundPermission: true);
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
 
-      const InitializationSettings initializationSettings = InitializationSettings(
+      const InitializationSettings initializationSettings =
+          InitializationSettings(
         android: initializationSettingsAndroid,
         iOS: initializationSettingsDarwin,
       );
@@ -34,20 +36,27 @@ class NotificationService extends GetxService {
         onDidReceiveNotificationResponse: (NotificationResponse response) {},
       );
     } catch (e) {
-      debugPrint('Local notifications not supported or mock in current environment: $e');
+      debugPrint(
+        'Local notifications not supported or mock in current environment: $e',
+      );
     }
   }
 
-  Future<void> showLowStockNotification(String productName, int currentStock) async {
+  Future<void> showPushNotification({
+    int id = 0,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
     try {
       const AndroidNotificationDetails androidPlatformChannelSpecifics =
           AndroidNotificationDetails(
-        'low_stock_alerts',
-        'Low Stock Alerts',
-        channelDescription: 'Notifications for products running low on stock',
+        'stockmate_alerts',
+        'StockMate Alerts',
+        channelDescription: 'Notifications and operational alerts for StockMate',
         importance: Importance.max,
         priority: Priority.high,
-        ticker: 'ticker',
+        ticker: 'StockMate',
       );
 
       const NotificationDetails platformChannelSpecifics = NotificationDetails(
@@ -55,14 +64,26 @@ class NotificationService extends GetxService {
       );
 
       await _flutterLocalNotificationsPlugin?.show(
-        id: 0,
-        title: 'Low Stock Alert! ⚠️',
-        body: '$productName is running low ($currentStock units left).',
+        id: id,
+        title: title,
+        body: body,
         notificationDetails: platformChannelSpecifics,
-        payload: 'item x',
+        payload: payload,
       );
     } catch (e) {
       debugPrint('Could not trigger notification: $e');
     }
+  }
+
+  Future<void> showLowStockNotification(
+    String productName,
+    int currentStock,
+  ) async {
+    await showPushNotification(
+      id: 1,
+      title: 'Low Stock Alert! ⚠️',
+      body: '$productName is running low ($currentStock units left).',
+      payload: 'low_stock',
+    );
   }
 }

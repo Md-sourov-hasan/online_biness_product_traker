@@ -10,6 +10,7 @@ import '../../../core/services/permission_service.dart';
 import '../../../core/services/report_export_service.dart';
 import '../../../core/theme/stockmate_theme.dart';
 import '../../../core/common/widgets/stockmate_components.dart';
+import '../../../core/utils/sizer.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -1565,74 +1566,70 @@ class _ReportsScreenState extends State<ReportsScreen> {
             'Top Products by Revenue',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: t.text),
           ),
-          const SizedBox(height: 12),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: topProducts.length,
-            separatorBuilder: (context, index) => Divider(color: t.border, height: 1),
-            itemBuilder: (context, i) {
-              final p = topProducts[i];
-              final barColor = t.chartBar[i % t.chartBar.length];
-
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(
-                  children: [
-                    // Rank Badge: 28x28, radius 8, chartBar[i] with alpha 33
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: t.withHexSuffix(barColor, "33"),
-                        borderRadius: BorderRadius.circular(8),
+          12.verticalSpace,
+          Column(
+            children: [
+              for (int i = 0; i < topProducts.length; i++) ...[
+                if (i > 0) Divider(color: t.border, height: 1),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Row(
+                    children: [
+                      // Rank Badge: 28x28, radius 8, chartBar[i] with alpha 33
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: t.withHexSuffix(t.chartBar[i % t.chartBar.length], "33"),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${i + 1}',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: t.chartBar[i % t.chartBar.length]),
+                        ),
                       ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '${i + 1}',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: barColor),
+                      12.horizontalSpace,
+                      // Name & sub-line
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              topProducts[i]['name'] as String,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: t.text),
+                            ),
+                            2.verticalSpace,
+                            Text(
+                              '${topProducts[i]['sold']} sold · Profit: ${fmt(topProducts[i]['profit'] as num, currency)}',
+                              style: TextStyle(fontSize: 11, color: t.textSec),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Name & sub-line
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      8.horizontalSpace,
+                      // Revenue & Margin label
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text(
-                            p['name'] as String,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: t.text),
+                            fmt(topProducts[i]['revenue'] as num, currency),
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: t.text),
                           ),
-                          const SizedBox(height: 2),
+                          2.verticalSpace,
                           Text(
-                            '${p['sold']} sold · Profit: ${fmt(p['profit'] as num, currency)}',
-                            style: TextStyle(fontSize: 11, color: t.textSec),
+                            'High margin',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: t.success),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Revenue & Margin label
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          fmt(p['revenue'] as num, currency),
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: t.text),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'High margin',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: t.success),
-                        ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              );
-            },
+              ],
+            ],
           ),
         ],
       ),

@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/common/styles/global_text_style.dart';
 import '../../../core/common/widgets/common_background.dart';
+import '../../../core/services/auth_service.dart';
 import '../../../core/services/theme_language_service.dart';
 import '../../../core/utils/constants/colors.dart';
 import '../../../core/utils/sizer.dart';
+import '../../../routes/app_routes.dart';
 import '../controllers/notifications_controller.dart';
 import '../models/notification_item.dart';
 
@@ -15,10 +17,11 @@ class NotificationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final NotificationsController controller = Get.put(
-      NotificationsController(),
-    );
+    final NotificationsController controller = Get.isRegistered<NotificationsController>()
+        ? Get.find<NotificationsController>()
+        : Get.put(NotificationsController());
     final ThemeLanguageService themeService = Get.find<ThemeLanguageService>();
+    final AuthService auth = Get.find<AuthService>();
 
     return CommonBackgroundScaffold(
       body: SafeArea(
@@ -28,7 +31,8 @@ class NotificationsScreen extends StatelessWidget {
             _buildFilterTabs(controller, themeService),
             Expanded(
               child: Obx(() {
-                final items = controller.filteredNotifications;
+                final items = controller.currentUserNotifications;
+                final isStaff = auth.currentUser.value?.isStaff ?? false;
 
                 if (items.isEmpty) {
                   return _buildEmptyState(themeService);
@@ -49,6 +53,7 @@ class NotificationsScreen extends StatelessWidget {
                         item,
                         controller,
                         themeService,
+                        isStaff: isStaff,
                       );
                     },
                   ),
@@ -61,7 +66,7 @@ class NotificationsScreen extends StatelessWidget {
     );
   }
 
-  // --- Header / App Bar ---
+  // --- Header / App Bar with Settings Gear (Spec Section 5) ---
   Widget _buildAppBar(
     BuildContext context,
     NotificationsController controller,
@@ -151,91 +156,136 @@ class NotificationsScreen extends StatelessWidget {
               ),
             ],
           ),
-          Obx(() {
-            final hasUnread = controller.unreadCount > 0;
-            return PopupMenuButton<String>(
-              color: themeService.cardColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.r),
-                side: BorderSide(color: themeService.t.border),
+          Row(
+            children: [
+              // Settings Gear Button on inbox header (Spec Section 5)
+              GestureDetector(
+                onTap: () => context.push(AppRoute.notificationSettingsScreen),
+                child: Container(
+                  padding: EdgeInsets.all(8.w),
+                  decoration: BoxDecoration(
+                    color: themeService.cardColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: themeService.t.border),
+                  ),
+                  child: Icon(
+                    Icons.settings_outlined,
+                    size: 18.w,
+                    color: themeService.textColor,
+                  ),
+                ),
               ),
-              icon: Container(
-                padding: EdgeInsets.all(8.w),
-                decoration: BoxDecoration(
+              8.horizontalSpace,
+              // Overflow Menu for inbox actions
+              Obx(() {
+                final hasUnread = controller.unreadCount > 0;
+                return PopupMenuButton<String>(
                   color: themeService.cardColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: themeService.t.border),
-                ),
-                child: Icon(
-                  Icons.more_vert_rounded,
-                  size: 18.w,
-                  color: themeService.textColor,
-                ),
-              ),
-              onSelected: (val) {
-                if (val == 'mark_read') {
-                  controller.markAllAsRead();
-                  Get.snackbar(
-                    'Notifications',
-                    'All notifications marked as read',
-                    snackPosition: SnackPosition.BOTTOM,
-                    duration: const Duration(seconds: 2),
-                  );
-                } else if (val == 'clear_all') {
-                  controller.clearAll();
-                  Get.snackbar(
-                    'Notifications',
-                    'All notifications cleared',
-                    snackPosition: SnackPosition.BOTTOM,
-                    duration: const Duration(seconds: 2),
-                  );
-                }
-              },
-              itemBuilder: (context) => [
-                if (hasUnread)
-                  PopupMenuItem(
-                    value: 'mark_read',
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.done_all_rounded,
-                          size: 16.w,
-                          color: AppColors.primary,
-                        ),
-                        8.horizontalSpace,
-                        Text(
-                          'Mark all as read',
-                          style: getTextStyle(
-                            fontSize: 12.sp,
-                            color: themeService.textColor,
-                          ),
-                        ),
-                      ],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12.r),
+                    side: BorderSide(color: themeService.t.border),
+                  ),
+                  icon: Container(
+                    padding: EdgeInsets.all(8.w),
+                    decoration: BoxDecoration(
+                      color: themeService.cardColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: themeService.t.border),
+                    ),
+                    child: Icon(
+                      Icons.more_vert_rounded,
+                      size: 18.w,
+                      color: themeService.textColor,
                     ),
                   ),
-                PopupMenuItem(
-                  value: 'clear_all',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.delete_sweep_outlined,
-                        size: 16.w,
-                        color: AppColors.error,
-                      ),
-                      8.horizontalSpace,
-                      Text(
-                        'Clear all',
-                        style: getTextStyle(
-                          fontSize: 12.sp,
-                          color: AppColors.error,
+                  onSelected: (val) {
+                    if (val == 'mark_read') {
+                      controller.markAllAsRead();
+                      Get.snackbar(
+                        'Notifications',
+                        'All notifications marked as read',
+                        snackPosition: SnackPosition.BOTTOM,
+                        duration: const Duration(seconds: 2),
+                      );
+                    } else if (val == 'clear_all') {
+                      controller.clearAll();
+                      Get.snackbar(
+                        'Notifications',
+                        'All notifications cleared',
+                        snackPosition: SnackPosition.BOTTOM,
+                        duration: const Duration(seconds: 2),
+                      );
+                    } else if (val == 'settings') {
+                      context.push(AppRoute.notificationSettingsScreen);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    if (hasUnread)
+                      PopupMenuItem(
+                        value: 'mark_read',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.done_all_rounded,
+                              size: 16.w,
+                              color: AppColors.primary,
+                            ),
+                            8.horizontalSpace,
+                            Text(
+                              'Mark all as read',
+                              style: getTextStyle(
+                                fontSize: 12.sp,
+                                color: themeService.textColor,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          }),
+                    PopupMenuItem(
+                      value: 'clear_all',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.delete_sweep_outlined,
+                            size: 16.w,
+                            color: AppColors.error,
+                          ),
+                          8.horizontalSpace,
+                          Text(
+                            'Clear all',
+                            style: getTextStyle(
+                              fontSize: 12.sp,
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'settings',
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.tune_rounded,
+                            size: 16.w,
+                            color: AppColors.primary,
+                          ),
+                          8.horizontalSpace,
+                          Text(
+                            'Settings',
+                            style: getTextStyle(
+                              fontSize: 12.sp,
+                              color: themeService.textColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }),
+            ],
+          ),
         ],
       ),
     );
@@ -310,24 +360,30 @@ class NotificationsScreen extends StatelessWidget {
     BuildContext context,
     AppNotificationItem item,
     NotificationsController controller,
-    ThemeLanguageService themeService,
-  ) {
+    ThemeLanguageService themeService, {
+    required bool isStaff,
+  }) {
     final IconData iconData;
     final Color iconColor;
     final Color iconBgColor;
 
     switch (item.type) {
       case NotificationType.lowStock:
+      case NotificationType.stock:
         iconData = Icons.warning_amber_rounded;
         iconColor = AppColors.error;
         iconBgColor = AppColors.error.withValues(alpha: 0.12);
         break;
       case NotificationType.pendingApproval:
+      case NotificationType.userSecurity:
         iconData = Icons.person_pin_circle_outlined;
         iconColor = AppColors.warning;
         iconBgColor = AppColors.warning.withValues(alpha: 0.12);
         break;
       case NotificationType.receivableDue:
+      case NotificationType.money:
+      case NotificationType.moneyLent:
+      case NotificationType.investor:
         iconData = Icons.receipt_long_rounded;
         iconColor = Colors.orange;
         iconBgColor = Colors.orange.withValues(alpha: 0.12);
@@ -337,10 +393,31 @@ class NotificationsScreen extends StatelessWidget {
         iconColor = AppColors.secondary;
         iconBgColor = AppColors.secondary.withValues(alpha: 0.12);
         break;
+      case NotificationType.discount:
+        iconData = Icons.discount_outlined;
+        iconColor = AppColors.purple;
+        iconBgColor = AppColors.purple.withValues(alpha: 0.12);
+        break;
+      case NotificationType.expense:
+        iconData = Icons.payments_outlined;
+        iconColor = Colors.deepOrangeAccent;
+        iconBgColor = Colors.deepOrangeAccent.withValues(alpha: 0.12);
+        break;
       case NotificationType.purchase:
         iconData = Icons.local_shipping_outlined;
         iconColor = Colors.teal;
         iconBgColor = Colors.teal.withValues(alpha: 0.12);
+        break;
+      case NotificationType.refund:
+      case NotificationType.exchange:
+        iconData = Icons.replay_rounded;
+        iconColor = Colors.amber;
+        iconBgColor = Colors.amber.withValues(alpha: 0.12);
+        break;
+      case NotificationType.supplier:
+        iconData = Icons.storefront_outlined;
+        iconColor = Colors.blueGrey;
+        iconBgColor = Colors.blueGrey.withValues(alpha: 0.12);
         break;
       case NotificationType.system:
       case NotificationType.activityLog:
@@ -351,6 +428,13 @@ class NotificationsScreen extends StatelessWidget {
     }
 
     final timeString = _formatTimeAgo(item.timestamp);
+
+    // Sanitize message for Staff: Staff must never see profit or purchase cost!
+    String displayMessage = item.message;
+    if (isStaff && displayMessage.toLowerCase().contains('profit')) {
+      displayMessage = displayMessage.replaceAll(RegExp(r'\(Profit: [^\)]+\)'), '');
+      displayMessage = displayMessage.replaceAll(RegExp(r'Profit: [^\s•,]+'), '');
+    }
 
     return Dismissible(
       key: Key(item.id),
@@ -424,16 +508,41 @@ class NotificationsScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        // Code Badge & Title
                         Expanded(
-                          child: Text(
-                            item.title,
-                            style: getTextStyle(
-                              fontSize: 13.sp,
-                              fontWeight: !item.isRead
-                                  ? FontWeight.w700
-                                  : FontWeight.w600,
-                              color: themeService.textColor,
-                            ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 1.5.h),
+                                decoration: BoxDecoration(
+                                  color: iconColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(4.r),
+                                ),
+                                child: Text(
+                                  item.code,
+                                  style: TextStyle(
+                                    fontSize: 9.sp,
+                                    fontWeight: FontWeight.w800,
+                                    color: iconColor,
+                                  ),
+                                ),
+                              ),
+                              6.horizontalSpace,
+                              Expanded(
+                                child: Text(
+                                  item.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: getTextStyle(
+                                    fontSize: 13.sp,
+                                    fontWeight: !item.isRead
+                                        ? FontWeight.w700
+                                        : FontWeight.w600,
+                                    color: themeService.textColor,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         if (!item.isRead) ...[
@@ -451,7 +560,7 @@ class NotificationsScreen extends StatelessWidget {
                     ),
                     4.verticalSpace,
                     Text(
-                      item.message,
+                      displayMessage,
                       style: getTextStyle(
                         fontSize: 11.sp,
                         fontWeight: FontWeight.w400,
@@ -470,25 +579,44 @@ class NotificationsScreen extends StatelessWidget {
                             color: themeService.textMutedColor,
                           ),
                         ),
-                        if (item.route != null)
-                          Row(
-                            children: [
-                              Text(
-                                'View',
-                                style: getTextStyle(
-                                  fontSize: 11.sp,
-                                  fontWeight: FontWeight.w700,
-                                  color: iconColor,
+                        Row(
+                          children: [
+                            if (!item.isRead)
+                              GestureDetector(
+                                onTap: () => controller.markAsRead(item.id),
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 6.w),
+                                  child: Icon(Icons.done_rounded, size: 14.w, color: themeService.subtextColor),
                                 ),
                               ),
-                              2.horizontalSpace,
-                              Icon(
-                                Icons.arrow_forward_ios_rounded,
-                                size: 10.w,
-                                color: iconColor,
+                            if (item.route != null) ...[
+                              GestureDetector(
+                                onTap: () {
+                                  controller.markAsRead(item.id);
+                                  context.push(item.route!, extra: item.routeExtra);
+                                },
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      'View',
+                                      style: getTextStyle(
+                                        fontSize: 11.sp,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                    2.horizontalSpace,
+                                    Icon(
+                                      Icons.arrow_forward_ios_rounded,
+                                      size: 10.w,
+                                      color: AppColors.primary,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
-                          ),
+                          ],
+                        ),
                       ],
                     ),
                   ],
@@ -504,69 +632,50 @@ class NotificationsScreen extends StatelessWidget {
   // --- Empty State ---
   Widget _buildEmptyState(ThemeLanguageService themeService) {
     return Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 32.w),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: EdgeInsets.all(24.w),
-              decoration: BoxDecoration(
-                color: themeService.cardColor,
-                shape: BoxShape.circle,
-                border: Border.all(color: themeService.t.border),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.notifications_none_rounded,
-                size: 48.w,
-                color: themeService.subtextColor.withValues(alpha: 0.6),
-              ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: EdgeInsets.all(20.w),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
             ),
-            16.verticalSpace,
-            Text(
-              'All Caught Up!',
-              style: getTextStyle(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w700,
-                color: themeService.textColor,
-              ),
+            child: Icon(
+              Icons.notifications_none_rounded,
+              size: 48.w,
+              color: AppColors.primary,
             ),
-            6.verticalSpace,
-            Text(
-              'No new alerts or notifications at the moment. When stock runs low or important activities occur, they will appear here.',
-              textAlign: TextAlign.center,
-              style: getTextStyle(
-                fontSize: 12.sp,
-                color: themeService.subtextColor,
-              ),
+          ),
+          16.verticalSpace,
+          Text(
+            'All caught up!',
+            style: getTextStyle(
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w700,
+              color: themeService.textColor,
             ),
-          ],
-        ),
+          ),
+          6.verticalSpace,
+          Text(
+            'No notifications in this filter.',
+            style: getTextStyle(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w400,
+              color: themeService.subtextColor,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  String _formatTimeAgo(DateTime time) {
-    final now = DateTime.now();
-    final difference = now.difference(time);
-
-    if (difference.inSeconds < 60) {
-      return 'Just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
-    } else {
-      return DateFormat('MMM dd, hh:mm a').format(time);
-    }
+  String _formatTimeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inSeconds < 60) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return DateFormat('MMM d').format(dt);
   }
 }

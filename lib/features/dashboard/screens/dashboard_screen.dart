@@ -14,19 +14,18 @@ import '../../../core/common/styles/global_text_style.dart';
 import '../../../core/common/widgets/common_background.dart';
 import '../../../routes/app_routes.dart';
 import '../../notifications/controllers/notifications_controller.dart';
+import '../../../core/models/product_model.dart';
+import '../../../core/models/activity_log_model.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final DashboardController controller = Get.put(DashboardController());
-    final DatabaseService db = Get.find<DatabaseService>();
-    final AuthService auth = Get.find<AuthService>();
+    if (!Get.isRegistered<DashboardController>()) {
+      Get.put(DashboardController());
+    }
     final PermissionService perm = Get.find<PermissionService>();
-    final ThemeLanguageService themeService = Get.find<ThemeLanguageService>();
-    final BottomNavigationController nav =
-        Get.find<BottomNavigationController>();
 
     return CommonBackgroundScaffold(
       body: SafeArea(
@@ -35,25 +34,11 @@ class DashboardScreen extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
           child: Obx(() {
             if (perm.isStaff) {
-              return _buildStaffDashboard(context, auth, db, themeService, nav);
+              return const _StaffDashboardView();
             } else if (perm.isManager) {
-              return _buildManagerDashboard(
-                context,
-                auth,
-                db,
-                controller,
-                themeService,
-                nav,
-              );
+              return const _ManagerDashboardView();
             } else {
-              return _buildOwnerDashboard(
-                context,
-                auth,
-                db,
-                controller,
-                themeService,
-                nav,
-              );
+              return const _OwnerDashboardView();
             }
           }),
         ),
@@ -64,7 +49,7 @@ class DashboardScreen extends StatelessWidget {
   // ===========================================================================
   // 1. STAFF DASHBOARD (Spec Section 6.1: Intentionally Minimal & Privacy-First)
   // ===========================================================================
-  Widget _buildStaffDashboard(
+  static Widget _buildStaffDashboard(
     BuildContext context,
     AuthService auth,
     DatabaseService db,
@@ -225,82 +210,85 @@ class DashboardScreen extends StatelessWidget {
           ),
         ),
         10.verticalSpace,
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: db.products.take(6).length,
-          separatorBuilder: (context, index) => 8.verticalSpace,
-          itemBuilder: (context, index) {
-            final p = db.products[index];
-            final inStock = p.quantity > 0;
-            return Container(
-              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-              decoration: BoxDecoration(
-                color: themeService.cardColor,
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(
-                  color: themeService.inputBorderColor,
-                  width: 0.5,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          p.displayName,
-                          style: TextStyle(
-                            fontSize: 13.sp,
-                            fontWeight: FontWeight.w600,
-                            color: themeService.textColor,
-                          ),
-                        ),
-                        Text(
-                          'Code: ${p.productCode} • ${inStock ? "${p.quantity} pcs available" : "Out of Stock"}',
-                          style: TextStyle(
-                            fontSize: 11.sp,
-                            color: inStock
-                                ? AppColors.success
-                                : Colors.redAccent,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '৳${p.sellingPrice.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      Text(
-                        'Selling Price',
-                        style: TextStyle(
-                          fontSize: 9.sp,
-                          color: themeService.subtextColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
+        Obx(() {
+          final products = db.products.take(6).toList();
+          return Column(
+            children: [
+              for (int i = 0; i < products.length; i++) ...[
+                if (i > 0) 8.verticalSpace,
+                _buildStaffProductRow(products[i], themeService),
+              ],
+            ],
+          );
+        }),
         80.verticalSpace,
       ],
     );
   }
 
-  Widget _buildStaffActionCard({
+  static Widget _buildStaffProductRow(Product p, ThemeLanguageService themeService) {
+    final inStock = p.quantity > 0;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+      decoration: BoxDecoration(
+        color: themeService.cardColor,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: themeService.inputBorderColor,
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  p.displayName,
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w600,
+                    color: themeService.textColor,
+                  ),
+                ),
+                Text(
+                  'Code: ${p.productCode} • ${inStock ? "${p.quantity} pcs available" : "Out of Stock"}',
+                  style: TextStyle(
+                    fontSize: 11.sp,
+                    color: inStock ? AppColors.success : Colors.redAccent,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '৳${p.sellingPrice.toStringAsFixed(0)}',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+              Text(
+                'Selling Price',
+                style: TextStyle(
+                  fontSize: 9.sp,
+                  color: themeService.subtextColor,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildStaffActionCard({
     required String title,
     required String subtitle,
     required IconData icon,
@@ -358,7 +346,7 @@ class DashboardScreen extends StatelessWidget {
   // ===========================================================================
   // 2. MANAGER DASHBOARD (Spec Section 5.4: Operational Metrics)
   // ===========================================================================
-  Widget _buildManagerDashboard(
+  static Widget _buildManagerDashboard(
     BuildContext context,
     AuthService auth,
     DatabaseService db,
@@ -406,20 +394,24 @@ class DashboardScreen extends StatelessWidget {
                 ],
               ),
               10.verticalSpace,
-              Text(
-                '${db.totalStockPieces} Units in Stock',
-                style: TextStyle(
-                  fontSize: 22.sp,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
+              Obx(
+                () => Text(
+                  '${db.totalStockPieces} Units in Stock',
+                  style: TextStyle(
+                    fontSize: 22.sp,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
                 ),
               ),
               4.verticalSpace,
-              Text(
-                'Across ${db.products.length} distinct SKUs & ${db.allBrands.length} brands',
-                style: TextStyle(
-                  fontSize: 12.sp,
-                  color: Colors.white.withValues(alpha: 0.85),
+              Obx(
+                () => Text(
+                  'Across ${db.products.length} distinct SKUs & ${db.allBrands.length} brands',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
                 ),
               ),
             ],
@@ -472,12 +464,14 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ),
                     4.verticalSpace,
-                    Text(
-                      '৳${db.totalExpenses.toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontSize: 18.sp,
-                        fontWeight: FontWeight.w800,
-                        color: themeService.textColor,
+                    Obx(
+                      () => Text(
+                        '৳${db.totalExpenses.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          fontSize: 18.sp,
+                          fontWeight: FontWeight.w800,
+                          color: themeService.textColor,
+                        ),
                       ),
                     ),
                   ],
@@ -561,7 +555,7 @@ class DashboardScreen extends StatelessWidget {
   // ===========================================================================
   // 3. OWNER DASHBOARD (Spec Section 2.1 & 10: Complete Financial & Audit Access)
   // ===========================================================================
-  Widget _buildOwnerDashboard(
+  static Widget _buildOwnerDashboard(
     BuildContext context,
     AuthService auth,
     DatabaseService db,
@@ -649,7 +643,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // --- Header with Exact-Time Sync (Spec Section 10.2) ---
-  Widget _buildHeader(
+  static Widget _buildHeader(
     BuildContext context,
     AuthService auth,
     DatabaseService db,
@@ -860,7 +854,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // --- Product Quantity & Valuation Card ---
-  Widget _buildProductQuantityCard(
+  static Widget _buildProductQuantityCard(
     DatabaseService db,
     ThemeLanguageService themeService,
     BottomNavigationController nav,
@@ -1022,7 +1016,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // --- Rotating Metric Card ---
-  Widget _buildRotatingMetricCard({
+  static Widget _buildRotatingMetricCard({
     required String title,
     required String value,
     required String subtitle,
@@ -1109,7 +1103,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // --- Comprehensive Accounting Engine Summary (Spec Section 9) ---
-  Widget _buildComprehensiveFinancialSummary(
+  static Widget _buildComprehensiveFinancialSummary(
     DatabaseService db,
     ThemeLanguageService themeService,
   ) {
@@ -1137,14 +1131,19 @@ class DashboardScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Financial Engine & Accounting Summary',
-                  style: TextStyle(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.w700,
-                    color: themeService.textColor,
+                Expanded(
+                  child: Text(
+                    'Financial Engine & Accounting Summary',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w700,
+                      color: themeService.textColor,
+                    ),
                   ),
                 ),
+                8.horizontalSpace,
                 Text(
                   'Spec Section 9',
                   style: TextStyle(
@@ -1215,22 +1214,53 @@ class DashboardScreen extends StatelessWidget {
               color: themeService.inputBorderColor.withValues(alpha: 0.5),
             ),
             8.verticalSpace,
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Gross: ৳${grossSales.toStringAsFixed(0)}  •  Discounts: -৳${discounts.toStringAsFixed(0)}  •  OpEx: -৳${expenses.toStringAsFixed(0)}  •  Refunds: -৳${refunds.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    fontSize: 10.sp,
-                    color: themeService.subtextColor,
-                  ),
+            Text.rich(
+              TextSpan(
+                style: TextStyle(
+                  fontSize: 10.sp,
+                  color: themeService.subtextColor,
+                  height: 1.4,
                 ),
-                if (loanInterest > 0)
-                  Text(
-                    'Loan Interest: -৳${loanInterest.toStringAsFixed(0)}',
-                    style: TextStyle(fontSize: 10.sp, color: Colors.redAccent),
+                children: [
+                  TextSpan(text: 'Gross: ৳${grossSales.toStringAsFixed(0)}'),
+                  TextSpan(
+                    text: '  •  ',
+                    style: TextStyle(
+                      color: themeService.subtextColor.withValues(alpha: 0.4),
+                    ),
                   ),
-              ],
+                  TextSpan(text: 'Discounts: -৳${discounts.toStringAsFixed(0)}'),
+                  TextSpan(
+                    text: '  •  ',
+                    style: TextStyle(
+                      color: themeService.subtextColor.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  TextSpan(text: 'OpEx: -৳${expenses.toStringAsFixed(0)}'),
+                  TextSpan(
+                    text: '  •  ',
+                    style: TextStyle(
+                      color: themeService.subtextColor.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  TextSpan(text: 'Refunds: -৳${refunds.toStringAsFixed(0)}'),
+                  if (loanInterest > 0) ...[
+                    TextSpan(
+                      text: '  •  ',
+                      style: TextStyle(
+                        color: themeService.subtextColor.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'Loan Interest: -৳${loanInterest.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ],
         ),
@@ -1238,7 +1268,7 @@ class DashboardScreen extends StatelessWidget {
     });
   }
 
-  Widget _buildFinancialItem(
+  static Widget _buildFinancialItem(
     String label,
     String amount,
     Color color,
@@ -1258,14 +1288,16 @@ class DashboardScreen extends StatelessWidget {
           ),
         ),
         4.verticalSpace,
-        Text(
-          amount,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: getTextStyle(
-            fontSize: 13.sp,
-            fontWeight: isBold ? FontWeight.w800 : FontWeight.w700,
-            color: color,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            amount,
+            maxLines: 1,
+            style: getTextStyle(
+              fontSize: 13.sp,
+              fontWeight: isBold ? FontWeight.w800 : FontWeight.w700,
+              color: color,
+            ),
           ),
         ),
       ],
@@ -1273,7 +1305,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // --- Owner Capital & Liabilities Hub (Spec Section 11, 12, 13) ---
-  Widget _buildOwnerCapitalHub(
+  static Widget _buildOwnerCapitalHub(
     BuildContext context,
     DatabaseService db,
     ThemeLanguageService theme,
@@ -1310,14 +1342,19 @@ class DashboardScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Owner Capital, Loans & Receivables',
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w700,
-                    color: theme.textColor,
+                Expanded(
+                  child: Text(
+                    'Owner Capital, Loans & Receivables',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w700,
+                      color: theme.textColor,
+                    ),
                   ),
                 ),
+                8.horizontalSpace,
                 Text(
                   'Exclusive Hub',
                   style: TextStyle(
@@ -1375,7 +1412,7 @@ class DashboardScreen extends StatelessWidget {
     });
   }
 
-  Widget _buildOwnerHubTile({
+  static Widget _buildOwnerHubTile({
     required String title,
     required String value,
     required String subtitle,
@@ -1406,14 +1443,17 @@ class DashboardScreen extends StatelessWidget {
               ),
             ),
             4.verticalSpace,
-            Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 13.sp,
-                fontWeight: FontWeight.w800,
-                color: theme.textColor,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w800,
+                  color: theme.textColor,
+                ),
               ),
             ),
             2.verticalSpace,
@@ -1428,7 +1468,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // --- Owner Quick Actions Grid ---
-  Widget _buildOwnerQuickActionsGrid(
+  static Widget _buildOwnerQuickActionsGrid(
     BuildContext context,
     BottomNavigationController nav,
     ThemeLanguageService themeService,
@@ -1522,7 +1562,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildActionItem(
+  static Widget _buildActionItem(
     String title,
     IconData icon,
     Color color,
@@ -1565,7 +1605,7 @@ class DashboardScreen extends StatelessWidget {
   }
 
   // --- Low Stock Alert Section ---
-  Widget _buildLowStockSection(
+  static Widget _buildLowStockSection(
     DatabaseService db,
     BuildContext context,
     ThemeLanguageService themeService,
@@ -1642,67 +1682,69 @@ class DashboardScreen extends StatelessWidget {
               ),
             );
           }
-          return ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: lowStock.length,
-            separatorBuilder: (context, index) => 8.verticalSpace,
-            itemBuilder: (context, index) {
-              final p = lowStock[index];
-              return Container(
-                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-                decoration: BoxDecoration(
-                  color: themeService.cardColor,
-                  borderRadius: BorderRadius.circular(12.r),
-                  border: Border.all(
-                    color: AppColors.error.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            p.displayName,
-                            style: TextStyle(
-                              fontSize: 13.sp,
-                              fontWeight: FontWeight.w600,
-                              color: themeService.textColor,
-                            ),
-                          ),
-                          Text(
-                            'Code: ${p.productCode} • Threshold: ${p.lowStockThreshold} pcs',
-                            style: TextStyle(
-                              fontSize: 11.sp,
-                              color: themeService.subtextColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      '${p.quantity} pcs left',
-                      style: TextStyle(
-                        fontSize: 13.sp,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.error,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
+          return Column(
+            children: [
+              for (int i = 0; i < lowStock.length; i++) ...[
+                if (i > 0) 8.verticalSpace,
+                _buildLowStockItem(lowStock[i], themeService),
+              ],
+            ],
           );
         }),
       ],
     );
   }
 
+  static Widget _buildLowStockItem(Product p, ThemeLanguageService themeService) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+      decoration: BoxDecoration(
+        color: themeService.cardColor,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: AppColors.error.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  p.displayName,
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w600,
+                    color: themeService.textColor,
+                  ),
+                ),
+                Text(
+                  'Code: ${p.productCode} • Threshold: ${p.lowStockThreshold} pcs',
+                  style: TextStyle(
+                    fontSize: 11.sp,
+                    color: themeService.subtextColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '${p.quantity} pcs left',
+            style: TextStyle(
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w800,
+              color: AppColors.error,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // --- Recent Activity Section ---
-  Widget _buildRecentActivitySection(
+  static Widget _buildRecentActivitySection(
     DatabaseService db,
     ThemeLanguageService themeService,
   ) {
@@ -1736,59 +1778,122 @@ class DashboardScreen extends StatelessWidget {
                 width: 0.5,
               ),
             ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: logs.length,
-              separatorBuilder: (context, index) => const Divider(height: 16),
-              itemBuilder: (context, index) {
-                final log = logs[index];
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(6.w),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                      child: Icon(
-                        Icons.bolt_rounded,
-                        color: AppColors.primary,
-                        size: 16.w,
-                      ),
-                    ),
-                    10.horizontalSpace,
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            log.title,
-                            style: TextStyle(
-                              fontSize: 13.sp,
-                              fontWeight: FontWeight.w600,
-                              color: themeService.textColor,
-                            ),
-                          ),
-                          2.verticalSpace,
-                          Text(
-                            log.description,
-                            style: TextStyle(
-                              fontSize: 11.sp,
-                              color: themeService.subtextColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
+            child: Column(
+              children: [
+                for (int i = 0; i < logs.length; i++) ...[
+                  if (i > 0) const Divider(height: 16),
+                  _buildActivityLogRow(logs[i], themeService),
+                ],
+              ],
             ),
           );
         }),
       ],
+    );
+  }
+
+  static Widget _buildActivityLogRow(ActivityLog log, ThemeLanguageService themeService) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: EdgeInsets.all(6.w),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8.r),
+          ),
+          child: Icon(
+            Icons.bolt_rounded,
+            color: AppColors.primary,
+            size: 16.w,
+          ),
+        ),
+        10.horizontalSpace,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                log.title,
+                style: TextStyle(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                  color: themeService.textColor,
+                ),
+              ),
+              2.verticalSpace,
+              Text(
+                log.description,
+                style: TextStyle(
+                  fontSize: 11.sp,
+                  color: themeService.subtextColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StaffDashboardView extends StatelessWidget {
+  const _StaffDashboardView();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = Get.find<AuthService>();
+    final db = Get.find<DatabaseService>();
+    final themeService = Get.find<ThemeLanguageService>();
+    final nav = Get.find<BottomNavigationController>();
+    return DashboardScreen._buildStaffDashboard(
+      context,
+      auth,
+      db,
+      themeService,
+      nav,
+    );
+  }
+}
+
+class _ManagerDashboardView extends StatelessWidget {
+  const _ManagerDashboardView();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = Get.find<AuthService>();
+    final db = Get.find<DatabaseService>();
+    final controller = Get.find<DashboardController>();
+    final themeService = Get.find<ThemeLanguageService>();
+    final nav = Get.find<BottomNavigationController>();
+    return DashboardScreen._buildManagerDashboard(
+      context,
+      auth,
+      db,
+      controller,
+      themeService,
+      nav,
+    );
+  }
+}
+
+class _OwnerDashboardView extends StatelessWidget {
+  const _OwnerDashboardView();
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = Get.find<AuthService>();
+    final db = Get.find<DatabaseService>();
+    final controller = Get.find<DashboardController>();
+    final themeService = Get.find<ThemeLanguageService>();
+    final nav = Get.find<BottomNavigationController>();
+    return DashboardScreen._buildOwnerDashboard(
+      context,
+      auth,
+      db,
+      controller,
+      themeService,
+      nav,
     );
   }
 }

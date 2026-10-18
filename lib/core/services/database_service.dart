@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -18,6 +19,9 @@ import '../models/receivable_model.dart';
 import '../models/refund_record_model.dart';
 import '../models/supplier_model.dart';
 import 'notification_service.dart';
+import '../../features/notifications/models/notification_item.dart';
+import '../../features/notifications/controllers/notifications_controller.dart';
+import '../../routes/app_routes.dart';
 
 class DatabaseService extends GetxService {
   static DatabaseService get to => Get.find<DatabaseService>();
@@ -55,6 +59,12 @@ class DatabaseService extends GetxService {
   Future<void> onInit() async {
     super.onInit();
     await _initStorage();
+  }
+
+  @override
+  void onClose() {
+    _saveDebounceTimer?.cancel();
+    super.onClose();
   }
 
   Future<void> _initStorage() async {
@@ -219,13 +229,44 @@ class DatabaseService extends GetxService {
         final updatedP = p.copyWith(quantity: p.quantity - item.quantity);
         products[productIndex] = updatedP;
 
-        // Low stock notification
-        if (updatedP.quantity <= updatedP.lowStockThreshold) {
+        // Low stock / Out of stock notification (STK-01 / STK-02)
+        if (updatedP.quantity <= 0) {
+          try {
+            if (Get.isRegistered<NotificationsController>()) {
+              Get.find<NotificationsController>().dispatchNotification(
+                AppNotificationItem(
+                  id: const Uuid().v4(),
+                  code: 'STK-01',
+                  title: 'Out of Stock Alert! 🚨',
+                  message: '${updatedP.displayName} has run completely out of stock (0 units remaining).',
+                  timestamp: DateTime.now(),
+                  type: NotificationType.lowStock,
+                  priority: NotificationPriority.high,
+                  recipientRole: 'Owner',
+                ),
+              );
+            }
+          } catch (_) {}
+        } else if (updatedP.quantity <= updatedP.lowStockThreshold) {
           try {
             if (Get.isRegistered<NotificationService>()) {
               Get.find<NotificationService>().showLowStockNotification(
                 updatedP.displayName,
                 updatedP.quantity,
+              );
+            }
+            if (Get.isRegistered<NotificationsController>()) {
+              Get.find<NotificationsController>().dispatchNotification(
+                AppNotificationItem(
+                  id: const Uuid().v4(),
+                  code: 'STK-02',
+                  title: 'Low Stock Warning ⚠️',
+                  message: '${updatedP.displayName} is running low on stock (${updatedP.quantity} remaining).',
+                  timestamp: DateTime.now(),
+                  type: NotificationType.lowStock,
+                  priority: NotificationPriority.medium,
+                  recipientRole: 'Owner',
+                ),
               );
             }
           } catch (_) {}
@@ -257,12 +298,75 @@ class DatabaseService extends GetxService {
     }
 
     final totalAmount = items.fold(0.0, (sum, i) => sum + i.netLineTotal);
+    final totalProfit = items.fold(0.0, (sum, i) => sum + i.estimatedProfit);
     logActivity(
       'sale',
       'Sale Completed [$salesId]',
       '${items.length} items sold by $sellerName ($sellerRole) for ৳${totalAmount.toStringAsFixed(0)} via $paymentMethod',
     );
     saveToLocal();
+
+    // Trigger Notification: SAL-01 & STF-01
+    try {
+      if (Get.isRegistered<NotificationsController>()) {
+        final notifCtrl = Get.find<NotificationsController>();
+        // SAL-01: Dispatched for Owner and Manager
+        notifCtrl.dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'SAL-01',
+            title: 'New Sale Completed 🛍️',
+            message: '$sellerName ($sellerRole) sold ${items.length} items totaling ৳${totalAmount.toStringAsFixed(0)} via $paymentMethod (Profit: ৳${totalProfit.toStringAsFixed(0)}).',
+            timestamp: DateTime.now(),
+            type: NotificationType.sale,
+            actorUserId: sellerId,
+            actorRole: sellerRole,
+            actorName: sellerName,
+            recipientRole: 'Owner',
+            metadata: {'profit': totalProfit, 'total': totalAmount, 'items': items.length},
+          ),
+        );
+
+        if (sellerRole.toLowerCase() == 'staff') {
+          // STF-01: Staff own confirmation
+          notifCtrl.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'STF-01',
+              title: 'Sale Successfully Saved ✅',
+              message: 'Your sale of ${items.length} items totaling ৳${totalAmount.toStringAsFixed(0)} has been recorded ($salesId).',
+              timestamp: DateTime.now(),
+              type: NotificationType.sale,
+              recipientRole: 'Staff',
+              recipientUserId: sellerId,
+              actorUserId: sellerId,
+              actorRole: sellerRole,
+              actorName: sellerName,
+              isSelfConfirmation: true,
+            ),
+          );
+        } else if (sellerRole.toLowerCase().contains('manager')) {
+          // Manager own confirmation
+          notifCtrl.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'SAL-01',
+              title: 'Sale Saved ✅',
+              message: 'Your sale of ${items.length} items totaling ৳${totalAmount.toStringAsFixed(0)} has been recorded.',
+              timestamp: DateTime.now(),
+              type: NotificationType.sale,
+              recipientRole: 'Manager',
+              recipientUserId: sellerId,
+              actorUserId: sellerId,
+              actorRole: sellerRole,
+              actorName: sellerName,
+              isSelfConfirmation: true,
+            ),
+          );
+        }
+      }
+    } catch (_) {}
+
     return salesId;
   }
 
@@ -341,6 +445,44 @@ class DatabaseService extends GetxService {
       '${quantityToRefund}x ${originalSale.productName} refunded for ৳${refundTotal.toStringAsFixed(0)} by $resolvedByRole. Reason: $reason',
     );
     saveToLocal();
+
+    // Trigger Notification: RET-01 & STF-09
+    try {
+      if (Get.isRegistered<NotificationsController>()) {
+        final notif = Get.find<NotificationsController>();
+        notif.dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'RET-01',
+            title: 'Refund Recorded ↩️',
+            message: '${quantityToRefund}x ${originalSale.productName} refunded for ৳${refundTotal.toStringAsFixed(0)} by $resolvedByRole.',
+            timestamp: DateTime.now(),
+            type: NotificationType.refund,
+            actorUserId: resolvedByUserId,
+            actorRole: resolvedByRole,
+            actorName: resolvedByRole,
+            recipientRole: 'Owner',
+          ),
+        );
+        if (resolvedByRole.toLowerCase() == 'staff') {
+          notif.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'STF-09',
+              title: 'Refund Recorded ✅',
+              message: 'Customer refund for ${originalSale.productName} (৳${refundTotal.toStringAsFixed(0)}) completed.',
+              timestamp: DateTime.now(),
+              type: NotificationType.refund,
+              recipientRole: 'Staff',
+              recipientUserId: resolvedByUserId,
+              actorUserId: resolvedByUserId,
+              isSelfConfirmation: true,
+            ),
+          );
+        }
+      }
+    } catch (_) {}
+
     return true;
   }
 
@@ -404,6 +546,44 @@ class DatabaseService extends GetxService {
       'Exchanged ${quantityReturned}x ${originalSale.productName} for ${replacementQuantity}x ${replacementProduct.displayName}. Difference paid: ৳${customerPaid.toStringAsFixed(0)}',
     );
     saveToLocal();
+
+    // Trigger Notification: RET-02 & STF-09
+    try {
+      if (Get.isRegistered<NotificationsController>()) {
+        final notif = Get.find<NotificationsController>();
+        notif.dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'RET-02',
+            title: 'Exchange Completed 🔄',
+            message: 'Exchanged ${quantityReturned}x ${originalSale.productName} for ${replacementQuantity}x ${replacementProduct.displayName} by $resolvedByRole.',
+            timestamp: DateTime.now(),
+            type: NotificationType.exchange,
+            actorUserId: resolvedByUserId,
+            actorRole: resolvedByRole,
+            actorName: resolvedByRole,
+            recipientRole: 'Owner',
+          ),
+        );
+        if (resolvedByRole.toLowerCase() == 'staff') {
+          notif.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'STF-09',
+              title: 'Exchange Completed ✅',
+              message: 'Exchange for ${originalSale.productName} completed successfully.',
+              timestamp: DateTime.now(),
+              type: NotificationType.exchange,
+              recipientRole: 'Staff',
+              recipientUserId: resolvedByUserId,
+              actorUserId: resolvedByUserId,
+              isSelfConfirmation: true,
+            ),
+          );
+        }
+      }
+    } catch (_) {}
+
     return true;
   }
 
@@ -414,14 +594,50 @@ class DatabaseService extends GetxService {
     products.add(product);
     logActivity('product_add', 'Product Added', '${product.displayName} (Code: ${product.productCode}) added. Cost: ৳${product.pricePerPiece.toStringAsFixed(0)}, Sell: ৳${product.sellingPrice.toStringAsFixed(0)}');
     saveToLocal();
+
+    try {
+      if (Get.isRegistered<NotificationsController>()) {
+        final notif = Get.find<NotificationsController>();
+        notif.dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'STK-04',
+            title: 'Product Added to Catalog 🏷️',
+            message: '${product.displayName} was added (Selling Price: ৳${product.sellingPrice.toStringAsFixed(0)}).',
+            timestamp: DateTime.now(),
+            type: NotificationType.stock,
+            recipientRole: 'Owner',
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   void updateProduct(Product product) {
     final index = products.indexWhere((p) => p.id == product.id);
     if (index != -1) {
+      final old = products[index];
+      final priceChanged = old.sellingPrice != product.sellingPrice;
       products[index] = product;
       logActivity('product_update', 'Product Updated', '${product.displayName} updated.');
       saveToLocal();
+
+      try {
+        if (Get.isRegistered<NotificationsController>()) {
+          final notif = Get.find<NotificationsController>();
+          notif.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'STK-04',
+              title: 'Product Catalog Changed 🏷️',
+              message: '${product.displayName} was modified${priceChanged ? " (Price updated: ৳${old.sellingPrice.toStringAsFixed(0)} ➔ ৳${product.sellingPrice.toStringAsFixed(0)})" : ""}.',
+              timestamp: DateTime.now(),
+              type: NotificationType.stock,
+              recipientRole: 'Owner',
+            ),
+          );
+        }
+      } catch (_) {}
     }
   }
 
@@ -431,6 +647,23 @@ class DatabaseService extends GetxService {
       products.removeWhere((item) => item.id == id);
       logActivity('product_delete', 'Product Deleted', '${p.displayName} was deleted.');
       saveToLocal();
+
+      try {
+        if (Get.isRegistered<NotificationsController>()) {
+          final notif = Get.find<NotificationsController>();
+          notif.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'STK-04',
+              title: 'Product Removed From Catalog 🗑️',
+              message: '${p.displayName} was deleted from inventory catalog.',
+              timestamp: DateTime.now(),
+              type: NotificationType.stock,
+              recipientRole: 'Owner',
+            ),
+          );
+        }
+      } catch (_) {}
     }
   }
 
@@ -490,6 +723,25 @@ class DatabaseService extends GetxService {
     purchases.insert(0, purchase);
     logActivity('purchase', 'Stock Restocked', 'Purchased ${quantity}x ${product.displayName} from $supplier for ৳${purchase.totalAmount.toStringAsFixed(0)}');
     saveToLocal();
+
+    // Trigger Notification: STK-03
+    try {
+      if (Get.isRegistered<NotificationsController>()) {
+        final notif = Get.find<NotificationsController>();
+        notif.dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'STK-03',
+            title: 'Stock Restocked 📦',
+            message: '${quantity}x ${product.displayName} restocked from $supplier (Total: ৳${purchase.totalAmount.toStringAsFixed(0)}).',
+            timestamp: DateTime.now(),
+            type: NotificationType.purchase,
+            recipientRole: 'Owner',
+            metadata: {'productId': product.id, 'quantity': quantity, 'total': purchase.totalAmount},
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   // ---------------------------------------------------------------------------
@@ -499,6 +751,86 @@ class DatabaseService extends GetxService {
     expenses.insert(0, expense);
     logActivity('expense', 'Expense Recorded', '${expense.category}: ৳${expense.amount.toStringAsFixed(0)} by ${expense.creatorName} (${expense.notes})');
     saveToLocal();
+
+    // Trigger Notification: EXP-01 / EXP-04 & STF-02
+    try {
+      if (Get.isRegistered<NotificationsController>()) {
+        final notif = Get.find<NotificationsController>();
+        final threshold = notif.settings.value.largeExpenseThreshold;
+        final isLarge = expense.amount >= threshold;
+
+        if (isLarge) {
+          // EXP-04: Large expense recorded
+          notif.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'EXP-04',
+              title: 'Large Expense Alert ⚠️',
+              message: 'Large expense recorded: ${expense.category} for ৳${expense.amount.toStringAsFixed(0)} by ${expense.creatorName}.',
+              timestamp: DateTime.now(),
+              type: NotificationType.expense,
+              priority: NotificationPriority.high,
+              recipientRole: 'Owner',
+              actorRole: expense.creatorRole,
+              actorUserId: expense.creatorId,
+              actorName: expense.creatorName,
+              metadata: {'amount': expense.amount, 'category': expense.category},
+            ),
+          );
+        } else {
+          // EXP-01: Regular expense recorded (Owner & Manager)
+          notif.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'EXP-01',
+              title: 'Expense Recorded 💸',
+              message: '${expense.category}: ৳${expense.amount.toStringAsFixed(0)} recorded by ${expense.creatorName}.',
+              timestamp: DateTime.now(),
+              type: NotificationType.expense,
+              recipientRole: 'Owner',
+              actorRole: expense.creatorRole,
+              actorUserId: expense.creatorId,
+              actorName: expense.creatorName,
+              metadata: {'amount': expense.amount, 'category': expense.category},
+            ),
+          );
+        }
+
+        if (expense.creatorRole.toLowerCase() == 'staff') {
+          // STF-02: Staff self-confirmation
+          notif.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'STF-02',
+              title: 'Expense Submitted ✅',
+              message: 'Your expense of ৳${expense.amount.toStringAsFixed(0)} (${expense.category}) was recorded.',
+              timestamp: DateTime.now(),
+              type: NotificationType.expense,
+              recipientRole: 'Staff',
+              recipientUserId: expense.creatorId,
+              actorUserId: expense.creatorId,
+              isSelfConfirmation: true,
+            ),
+          );
+        } else if (expense.creatorRole.toLowerCase().contains('manager')) {
+          // Manager self confirmation
+          notif.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'EXP-01',
+              title: 'Expense Saved ✅',
+              message: 'Your expense of ৳${expense.amount.toStringAsFixed(0)} (${expense.category}) was recorded.',
+              timestamp: DateTime.now(),
+              type: NotificationType.expense,
+              recipientRole: 'Manager',
+              recipientUserId: expense.creatorId,
+              actorUserId: expense.creatorId,
+              isSelfConfirmation: true,
+            ),
+          );
+        }
+      }
+    } catch (_) {}
   }
 
   void updateExpense(Expense expense) {
@@ -507,13 +839,82 @@ class DatabaseService extends GetxService {
       expenses[index] = expense;
       logActivity('expense', 'Expense Updated', '${expense.category}: ৳${expense.amount.toStringAsFixed(0)}');
       saveToLocal();
+
+      try {
+        if (Get.isRegistered<NotificationsController>()) {
+          final notif = Get.find<NotificationsController>();
+          // EXP-02: Expense edited (Owner)
+          notif.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'EXP-02',
+              title: 'Expense Modified ✏️',
+              message: '${expense.category} expense was updated to ৳${expense.amount.toStringAsFixed(0)}.',
+              timestamp: DateTime.now(),
+              type: NotificationType.expense,
+              recipientRole: 'Owner',
+            ),
+          );
+
+          if (expense.creatorRole.toLowerCase() == 'staff' && expense.creatorId.isNotEmpty) {
+            // STF-03: Expense edited notification to staff
+            notif.dispatchNotification(
+              AppNotificationItem(
+                id: const Uuid().v4(),
+                code: 'STF-03',
+                title: 'Expense Record Updated ✏️',
+                message: 'Your submitted expense (${expense.category}, ৳${expense.amount.toStringAsFixed(0)}) was modified.',
+                timestamp: DateTime.now(),
+                type: NotificationType.expense,
+                recipientRole: 'Staff',
+                recipientUserId: expense.creatorId,
+              ),
+            );
+          }
+        }
+      } catch (_) {}
     }
   }
 
   void deleteExpense(String id) {
+    final exp = expenses.firstWhereOrNull((e) => e.id == id);
     expenses.removeWhere((e) => e.id == id);
     logActivity('expense', 'Expense Deleted', 'Expense entry removed.');
     saveToLocal();
+
+    try {
+      if (Get.isRegistered<NotificationsController>() && exp != null) {
+        final notif = Get.find<NotificationsController>();
+        // EXP-03: Expense deleted (Owner)
+        notif.dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'EXP-03',
+            title: 'Expense Removed 🗑️',
+            message: '${exp.category} expense of ৳${exp.amount.toStringAsFixed(0)} was deleted.',
+            timestamp: DateTime.now(),
+            type: NotificationType.expense,
+            recipientRole: 'Owner',
+          ),
+        );
+
+        if (exp.creatorRole.toLowerCase() == 'staff' && exp.creatorId.isNotEmpty) {
+          // STF-04: Expense deleted notification to staff
+          notif.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'STF-04',
+              title: 'Expense Record Removed 🗑️',
+              message: 'Your submitted expense record (${exp.category}, ৳${exp.amount.toStringAsFixed(0)}) was deleted.',
+              timestamp: DateTime.now(),
+              type: NotificationType.expense,
+              recipientRole: 'Staff',
+              recipientUserId: exp.creatorId,
+            ),
+          );
+        }
+      }
+    } catch (_) {}
   }
 
   // Filter expenses for Staff (Spec Section 6.3: Last 30 days and own entries only)
@@ -542,6 +943,29 @@ class DatabaseService extends GetxService {
     discountRules.insert(0, rule);
     logActivity('discount', 'Discount Requested', '${rule.name} (${rule.discountPercentage}%) requested by ${rule.requesterName}');
     saveToLocal();
+
+    try {
+      if (Get.isRegistered<NotificationsController>() && rule.status == 'pending') {
+        final notif = Get.find<NotificationsController>();
+        // DSC-01: Discount requested by Manager
+        notif.dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'DSC-01',
+            title: 'Discount Approval Requested 🏷️',
+            message: '${rule.name} (${rule.discountPercentage.toStringAsFixed(0)}%) requested by ${rule.requesterName}.',
+            timestamp: DateTime.now(),
+            type: NotificationType.discount,
+            priority: NotificationPriority.high,
+            recipientRole: 'Owner',
+            route: AppRoute.discountManagementScreen,
+            actorRole: 'Manager',
+            actorUserId: rule.requesterId,
+            actorName: rule.requesterName,
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   void approveDiscount(String ruleId, String approverId, String approverName) {
@@ -552,8 +976,29 @@ class DatabaseService extends GetxService {
         approverId: approverId,
         approverName: approverName,
       );
-      logActivity('discount', 'Discount Approved', '${discountRules[index].name} approved by $approverName');
+      final rule = discountRules[index];
+      logActivity('discount', 'Discount Approved', '${rule.name} approved by $approverName');
       saveToLocal();
+
+      try {
+        if (Get.isRegistered<NotificationsController>() && rule.requesterId.isNotEmpty) {
+          final notif = Get.find<NotificationsController>();
+          // DSC-02: Discount result to Manager. NEVER show Owner's name, only approved status.
+          notif.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'DSC-02',
+              title: 'Discount Request Approved ✅',
+              message: 'Your discount request for "${rule.name}" (${rule.discountPercentage.toStringAsFixed(0)}%) has been APPROVED.',
+              timestamp: DateTime.now(),
+              type: NotificationType.discount,
+              priority: NotificationPriority.high,
+              recipientRole: 'Manager',
+              recipientUserId: rule.requesterId,
+            ),
+          );
+        }
+      } catch (_) {}
     }
   }
 
@@ -561,8 +1006,29 @@ class DatabaseService extends GetxService {
     final index = discountRules.indexWhere((r) => r.id == ruleId);
     if (index != -1) {
       discountRules[index] = discountRules[index].copyWith(status: 'rejected');
-      logActivity('discount', 'Discount Rejected', '${discountRules[index].name} rejected.');
+      final rule = discountRules[index];
+      logActivity('discount', 'Discount Rejected', '${rule.name} rejected.');
       saveToLocal();
+
+      try {
+        if (Get.isRegistered<NotificationsController>() && rule.requesterId.isNotEmpty) {
+          final notif = Get.find<NotificationsController>();
+          // DSC-02: Discount result to Manager. NEVER show Owner's name, only rejected status.
+          notif.dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'DSC-02',
+              title: 'Discount Request Rejected ❌',
+              message: 'Your discount request for "${rule.name}" (${rule.discountPercentage.toStringAsFixed(0)}%) has been REJECTED.',
+              timestamp: DateTime.now(),
+              type: NotificationType.discount,
+              priority: NotificationPriority.high,
+              recipientRole: 'Manager',
+              recipientUserId: rule.requesterId,
+            ),
+          );
+        }
+      } catch (_) {}
     }
   }
 
@@ -581,6 +1047,22 @@ class DatabaseService extends GetxService {
     ));
     logActivity('investor', 'New Investor Added', '${investor.name} added with capital ৳${investor.initialInvestedAmount.toStringAsFixed(0)} (${investor.ownershipPercentage}% equity)');
     saveToLocal();
+
+    try {
+      if (Get.isRegistered<NotificationsController>()) {
+        Get.find<NotificationsController>().dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'MNY-04',
+            title: 'New Investor Added 📈',
+            message: '${investor.name} added with capital ৳${investor.initialInvestedAmount.toStringAsFixed(0)} (${investor.ownershipPercentage}% equity).',
+            timestamp: DateTime.now(),
+            type: NotificationType.investor,
+            recipientRole: 'Owner',
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   void updateInvestor(Investor investor) {
@@ -595,6 +1077,22 @@ class DatabaseService extends GetxService {
   void addInvestorTransaction(InvestorTransaction tx) {
     investorTransactions.insert(0, tx);
     saveToLocal();
+
+    try {
+      if (Get.isRegistered<NotificationsController>()) {
+        Get.find<NotificationsController>().dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'MNY-04',
+            title: 'Investor Transaction 📊',
+            message: '${tx.type.toUpperCase()}: ৳${tx.amount.toStringAsFixed(0)} recorded (${tx.notes}).',
+            timestamp: DateTime.now(),
+            type: NotificationType.investor,
+            recipientRole: 'Owner',
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   double getNetActiveCapitalForInvestor(String investorId) {
@@ -621,6 +1119,22 @@ class DatabaseService extends GetxService {
     loans.add(loan);
     logActivity('loan', 'Loan Recorded', 'Borrowed ৳${loan.principalBorrowed.toStringAsFixed(0)} from ${loan.lenderName} (${loan.interestRate}% ${loan.interestRateUnit})');
     saveToLocal();
+
+    try {
+      if (Get.isRegistered<NotificationsController>()) {
+        Get.find<NotificationsController>().dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'MNY-01',
+            title: 'Loan Recorded 🏦',
+            message: 'Borrowed ৳${loan.principalBorrowed.toStringAsFixed(0)} from ${loan.lenderName}.',
+            timestamp: DateTime.now(),
+            type: NotificationType.moneyLent,
+            recipientRole: 'Owner',
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   void updateLoan(Loan loan) {
@@ -642,6 +1156,22 @@ class DatabaseService extends GetxService {
     }
     logActivity('loan', 'Loan Repayment', 'Paid ৳${payment.totalAmount.toStringAsFixed(0)} (Principal: ৳${payment.principalPaid.toStringAsFixed(0)}, Interest: ৳${payment.interestPaid.toStringAsFixed(0)})');
     saveToLocal();
+
+    try {
+      if (Get.isRegistered<NotificationsController>()) {
+        Get.find<NotificationsController>().dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'MNY-02',
+            title: 'Loan Repayment Recorded 💳',
+            message: 'Paid ৳${payment.totalAmount.toStringAsFixed(0)} for loan repayment.',
+            timestamp: DateTime.now(),
+            type: NotificationType.moneyLent,
+            recipientRole: 'Owner',
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   double getOutstandingLoanPrincipal(String loanId) {
@@ -661,6 +1191,22 @@ class DatabaseService extends GetxService {
     receivables.add(receivable);
     logActivity('money_lent', 'Money Lent', 'Lent ৳${receivable.amountLent.toStringAsFixed(0)} to ${receivable.borrower}');
     saveToLocal();
+
+    try {
+      if (Get.isRegistered<NotificationsController>()) {
+        Get.find<NotificationsController>().dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'MNY-03',
+            title: 'Money Lent Recorded 🤝',
+            message: 'Lent ৳${receivable.amountLent.toStringAsFixed(0)} to ${receivable.borrower}.',
+            timestamp: DateTime.now(),
+            type: NotificationType.receivableDue,
+            recipientRole: 'Owner',
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   void updateReceivable(Receivable receivable) {
@@ -684,6 +1230,22 @@ class DatabaseService extends GetxService {
     }
     logActivity('money_lent', 'Receivable Repayment', 'Received ৳${payment.totalReceived.toStringAsFixed(0)} from borrower (Principal: ৳${payment.principalReturned.toStringAsFixed(0)}, Interest Income: ৳${payment.interestReceived.toStringAsFixed(0)})');
     saveToLocal();
+
+    try {
+      if (Get.isRegistered<NotificationsController>()) {
+        Get.find<NotificationsController>().dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'MNY-03',
+            title: 'Receivable Payment Received 💵',
+            message: 'Received ৳${payment.totalReceived.toStringAsFixed(0)} payment from debtor.',
+            timestamp: DateTime.now(),
+            type: NotificationType.receivableDue,
+            recipientRole: 'Owner',
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   double getOutstandingReceivablePrincipal(String receivableId) {
@@ -712,6 +1274,22 @@ class DatabaseService extends GetxService {
     suppliers.add(supplier);
     logActivity('supplier', 'Supplier Added', '${supplier.name} added.');
     saveToLocal();
+
+    try {
+      if (Get.isRegistered<NotificationsController>()) {
+        Get.find<NotificationsController>().dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'SUP-01',
+            title: 'Supplier Added 🚚',
+            message: '${supplier.name} added to suppliers catalog.',
+            timestamp: DateTime.now(),
+            type: NotificationType.stock,
+            recipientRole: 'Owner',
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   void updateSupplier(Supplier supplier) {
@@ -719,12 +1297,44 @@ class DatabaseService extends GetxService {
     if (index != -1) {
       suppliers[index] = supplier;
       saveToLocal();
+
+      try {
+        if (Get.isRegistered<NotificationsController>()) {
+          Get.find<NotificationsController>().dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'SUP-01',
+              title: 'Supplier Updated 🚚',
+              message: '${supplier.name} profile was updated.',
+              timestamp: DateTime.now(),
+              type: NotificationType.stock,
+              recipientRole: 'Owner',
+            ),
+          );
+        }
+      } catch (_) {}
     }
   }
 
   void deleteSupplier(String id) {
     suppliers.removeWhere((s) => s.id == id);
     saveToLocal();
+
+    try {
+      if (Get.isRegistered<NotificationsController>()) {
+        Get.find<NotificationsController>().dispatchNotification(
+          AppNotificationItem(
+            id: const Uuid().v4(),
+            code: 'SUP-01',
+            title: 'Supplier Removed 🗑️',
+            message: 'Supplier was removed from catalog.',
+            timestamp: DateTime.now(),
+            type: NotificationType.stock,
+            recipientRole: 'Owner',
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   // ---------------------------------------------------------------------------
@@ -736,6 +1346,27 @@ class DatabaseService extends GetxService {
       users[index] = users[index].copyWith(approvalStatus: status);
       logActivity('user', 'User Status Updated', '${users[index].name} marked as $status');
       saveToLocal();
+
+      try {
+        if (Get.isRegistered<NotificationsController>()) {
+          final isApproved = status == 'approved';
+          Get.find<NotificationsController>().dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'STF-08',
+              title: isApproved ? 'Account Approved 🎉' : 'Account Status Updated ⚠️',
+              message: isApproved
+                  ? 'Your account has been approved. You now have full access to StockMate.'
+                  : 'Your account registration status is $status.',
+              timestamp: DateTime.now(),
+              type: NotificationType.system,
+              priority: NotificationPriority.high,
+              recipientRole: 'Staff',
+              recipientUserId: userId,
+            ),
+          );
+        }
+      } catch (_) {}
     }
   }
 
@@ -745,6 +1376,24 @@ class DatabaseService extends GetxService {
       users[index] = users[index].copyWith(role: role);
       logActivity('user', 'User Role Changed', '${users[index].name} role set to $role');
       saveToLocal();
+
+      try {
+        if (Get.isRegistered<NotificationsController>()) {
+          Get.find<NotificationsController>().dispatchNotification(
+            AppNotificationItem(
+              id: const Uuid().v4(),
+              code: 'STF-08',
+              title: 'Account Role Updated 🛡️',
+              message: 'Your account role has been updated to $role.',
+              timestamp: DateTime.now(),
+              type: NotificationType.system,
+              priority: NotificationPriority.high,
+              recipientRole: 'Staff',
+              recipientUserId: userId,
+            ),
+          );
+        }
+      } catch (_) {}
     }
   }
 
@@ -787,9 +1436,23 @@ class DatabaseService extends GetxService {
   }
 
   // ---------------------------------------------------------------------------
-  // Persistence (SharedPreferences JSON Storage)
+  // Persistence (SharedPreferences JSON Storage with debounced save)
   // ---------------------------------------------------------------------------
-  Future<void> saveToLocal() async {
+  Timer? _saveDebounceTimer;
+
+  Future<void> saveToLocal({bool immediate = false}) async {
+    if (immediate) {
+      _saveDebounceTimer?.cancel();
+      await _executeSave();
+    } else {
+      _saveDebounceTimer?.cancel();
+      _saveDebounceTimer = Timer(const Duration(milliseconds: 200), () {
+        _executeSave();
+      });
+    }
+  }
+
+  Future<void> _executeSave() async {
     try {
       if (_prefs == null) return;
       await _prefs!.setString('sm_products', jsonEncode(products.map((e) => e.toMap()).toList()));
