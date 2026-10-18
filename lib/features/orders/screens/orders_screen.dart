@@ -3,9 +3,10 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../controllers/orders_controller.dart';
 import '../../../core/utils/sizer.dart';
-import '../../../core/utils/constants/colors.dart';
 import '../../../core/common/styles/global_text_style.dart';
 import '../../../core/common/widgets/common_background.dart';
+import '../../../core/common/widgets/stockmate_components.dart';
+import '../../../core/services/theme_language_service.dart';
 
 class OrdersScreen extends StatelessWidget {
   const OrdersScreen({super.key});
@@ -13,135 +14,125 @@ class OrdersScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final OrdersController controller = Get.put(OrdersController());
+    final ThemeLanguageService theme = Get.find<ThemeLanguageService>();
 
-    return CommonBackgroundScaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundLight,
-        title: Text(
-          'Orders',
-          style: getTextStyle(
-            fontSize: 24.sp,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+    return Obx(() {
+      final t = theme.t;
+
+      return CommonBackgroundScaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: Text(
+            'Orders',
+            style: getTextStyle(
+              fontSize: 22.sp,
+              fontWeight: FontWeight.w700,
+              color: t.text,
+            ),
           ),
         ),
-        elevation: 0,
-      ),
-      body: Obx(() {
-        if (controller.orders.isEmpty) {
-          return Center(
-            child: Text(
-              'No orders yet.',
-              textAlign: TextAlign.center,
-              style: getTextStyle(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w400,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          );
-        }
+        body: controller.orders.isEmpty
+            ? StockMateEmptyState(
+                icon: Icons.receipt_long_rounded,
+                title: 'No orders yet',
+                description: 'Orders placed will appear here with full delivery tracking.',
+                t: t,
+              )
+            : ListView.separated(
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.all(16.w),
+                itemCount: controller.orders.length,
+                separatorBuilder: (context, index) => 12.verticalSpace,
+                itemBuilder: (context, index) {
+                  final order = controller.orders[index];
+                  final dateStr = DateFormat('MMM dd, yyyy • hh:mm a').format(order.createdAt);
+                  final isDelivered = order.status.toLowerCase() == 'delivered';
+                  final badgeColor = isDelivered ? t.success : t.warning;
 
-        return ListView.separated(
-          padding: EdgeInsets.all(16.w),
-          itemCount: controller.orders.length,
-          separatorBuilder: (context, index) => 12.verticalSpace,
-          itemBuilder: (context, index) {
-            final order = controller.orders[index];
-            final dateStr = DateFormat('MMM dd, yyyy • hh:mm a').format(order.createdAt);
-
-            return Container(
-              padding: EdgeInsets.all(16.w),
-              decoration: BoxDecoration(
-                color: AppColors.cardBackground,
-                borderRadius: BorderRadius.circular(16.r),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '#${order.id.length > 6 ? order.id.substring(0, 6).toUpperCase() : order.id.toUpperCase()}',
-                        style: getTextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
+                  return Container(
+                    padding: EdgeInsets.all(16.w),
+                    decoration: BoxDecoration(
+                      color: t.card,
+                      borderRadius: BorderRadius.circular(16.r),
+                      border: Border.all(color: t.border, width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: t.shadow,
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
                         ),
-                      ),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                        decoration: BoxDecoration(
-                          color: AppColors.secondary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8.r),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '#${order.id.length > 6 ? order.id.substring(0, 6).toUpperCase() : order.id.toUpperCase()}',
+                              style: getTextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w700,
+                                color: t.accent,
+                              ),
+                            ),
+                            StockMateBadge(
+                              label: order.status.toUpperCase(),
+                              color: badgeColor,
+                              isSmall: true,
+                            ),
+                          ],
                         ),
-                        child: Text(
-                          order.status.toUpperCase(),
+                        12.verticalSpace,
+                        Text(
+                          order.customerName,
                           style: getTextStyle(
-                            fontSize: 10.sp,
+                            fontSize: 16.sp,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.secondary,
+                            color: t.text,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  12.verticalSpace,
-                  Text(
-                    order.customerName,
-                    style: getTextStyle(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  4.verticalSpace,
-                  Text(
-                    '${order.items.length} items • $dateStr',
-                    style: getTextStyle(
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w400,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  12.verticalSpace,
-                  const Divider(),
-                  8.verticalSpace,
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Total Amount',
-                        style: getTextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondary,
+                        4.verticalSpace,
+                        Text(
+                          '${order.items.length} items • $dateStr',
+                          style: getTextStyle(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w400,
+                            color: t.textSec,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '৳${order.totalAmount.toStringAsFixed(2)}',
-                        style: getTextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                        12.verticalSpace,
+                        Divider(color: t.border, height: 1),
+                        10.verticalSpace,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Total Amount',
+                              style: getTextStyle(
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w500,
+                                color: t.textSec,
+                              ),
+                            ),
+                            Text(
+                              '৳${order.totalAmount.toStringAsFixed(2)}',
+                              style: getTextStyle(
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.w800,
+                                color: t.text,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  );
+                },
               ),
-            );
-          },
-        );
-      }),
-    );
+      );
+    });
   }
 }

@@ -158,7 +158,7 @@ class ProductsScreen extends StatelessWidget {
               runSpacing: 4.h,
               children: [
                 _buildMiniBadge('$totalUnits', 'total_units'.tr, AppColors.secondary, themeService),
-                _buildMiniBadge('$totalBrands', 'brands_count'.tr, const Color(0xFF8B5CF6), themeService),
+                _buildMiniBadge('$totalBrands', 'brands_count'.tr, AppColors.purple, themeService),
               ],
             ),
           ],
@@ -285,25 +285,43 @@ class ProductsScreen extends StatelessWidget {
           // Brand Filter Horizontal Pills
           Obx(() {
             final brands = controller.brandList;
+            final selectedBrand = controller.selectedBrandFilter.value;
+            final activeColor = themeService.accentColor;
+
             return SizedBox(
-              height: 32.h,
+              height: 34.h,
               child: ListView.separated(
+                physics: const BouncingScrollPhysics(),
                 scrollDirection: Axis.horizontal,
                 itemCount: brands.length,
                 separatorBuilder: (c, i) => 8.horizontalSpace,
                 itemBuilder: (context, index) {
                   final brand = brands[index];
-                  final isSelected = controller.selectedBrandFilter.value == brand;
+                  final isSelected = selectedBrand == brand;
+
                   return GestureDetector(
-                    onTap: () => controller.selectedBrandFilter.value = brand,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+                    onTap: () {
+                      controller.selectedBrandFilter.value = brand;
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 5.h),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary : themeService.cardColor,
+                        color: isSelected ? activeColor : themeService.cardColor,
                         borderRadius: BorderRadius.circular(20.r),
                         border: Border.all(
-                          color: isSelected ? AppColors.primary : themeService.inputBorderColor,
+                          color: isSelected ? activeColor : themeService.inputBorderColor,
+                          width: isSelected ? 1.5 : 1,
                         ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: activeColor.withValues(alpha: 0.3),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
                       ),
                       child: Center(
                         child: Text(
@@ -311,7 +329,7 @@ class ProductsScreen extends StatelessWidget {
                           style: getTextStyle(
                             fontSize: 12.sp,
                             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                            color: isSelected ? Colors.white : themeService.textColor,
+                            color: isSelected ? AppColors.white : themeService.textColor,
                           ),
                         ),
                       ),
@@ -336,6 +354,7 @@ class ProductsScreen extends StatelessWidget {
     final grouped = controller.groupedByBrand;
 
     return ListView.separated(
+      physics: const BouncingScrollPhysics(),
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
       itemCount: grouped.keys.length,
       separatorBuilder: (c, i) => 16.verticalSpace,
@@ -434,6 +453,7 @@ class ProductsScreen extends StatelessWidget {
     ThemeLanguageService themeService,
   ) {
     return ListView.separated(
+      physics: const BouncingScrollPhysics(),
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
       itemCount: controller.filteredProducts.length,
       separatorBuilder: (c, i) => 12.verticalSpace,

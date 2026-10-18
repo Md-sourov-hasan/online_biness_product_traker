@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import '../styles/global_text_style.dart';
+import '../../services/theme_language_service.dart';
 import '../../utils/constants/colors.dart';
 import '../../utils/sizer.dart';
 
@@ -23,6 +25,13 @@ class CustomFilledButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Color btnColor = color ?? AppColors.primary;
+    try {
+      if (color == null && Get.isRegistered<ThemeLanguageService>()) {
+        btnColor = Get.find<ThemeLanguageService>().accentColor;
+      }
+    } catch (_) {}
+
     return Padding(
       padding: padding ?? EdgeInsets.zero,
       child: SizedBox(
@@ -31,7 +40,7 @@ class CustomFilledButton extends StatelessWidget {
         child: ElevatedButton(
           onPressed: isLoading ? null : onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: color ?? AppColors.primary,
+            backgroundColor: btnColor,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12.r),
             ),
@@ -42,7 +51,7 @@ class CustomFilledButton extends StatelessWidget {
                   width: 24.w,
                   height: 24.h,
                   child: const CircularProgressIndicator(
-                    color: Colors.white,
+                    color: AppColors.white,
                     strokeWidth: 2.5,
                   ),
                 )
@@ -51,7 +60,7 @@ class CustomFilledButton extends StatelessWidget {
                   style: getTextStyle(
                     fontSize: 15.sp,
                     fontWeight: FontWeight.w700,
-                    color: textColor ?? Colors.white,
+                    color: textColor ?? AppColors.white,
                   ),
                 ),
         ),

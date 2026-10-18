@@ -74,6 +74,7 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
                 SizedBox(
                   height: 32.h,
                   child: ListView(
+                    physics: const BouncingScrollPhysics(),
                     scrollDirection: Axis.horizontal,
                     children: [
                       _buildTypePill('All', 'all'),
@@ -103,11 +104,22 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
 
               if (logs.isEmpty) {
                 return Center(
-                  child: Text('No activity logs found.', style: TextStyle(color: themeService.subtextColor)),
+                  child: Padding(
+                    padding: EdgeInsets.all(24.w),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.history_toggle_off_rounded, size: 48.w, color: themeService.subtextColor),
+                        12.verticalSpace,
+                        Text('No activity logs found.', style: TextStyle(color: themeService.subtextColor, fontSize: 14.sp)),
+                      ],
+                    ),
+                  ),
                 );
               }
 
               return ListView.separated(
+                physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
                 itemCount: logs.length,
                 separatorBuilder: (c, i) => 10.verticalSpace,
@@ -168,10 +180,15 @@ class _ActivityLogsScreenState extends State<ActivityLogsScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    log.title,
-                                    style: getTextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
+                                  Expanded(
+                                    child: Text(
+                                      log.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: getTextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
+                                    ),
                                   ),
+                                  8.horizontalSpace,
                                   Container(
                                     padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
                                     decoration: BoxDecoration(

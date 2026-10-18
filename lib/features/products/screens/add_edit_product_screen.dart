@@ -244,7 +244,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
               controller.deleteProduct(widget.product!.id);
               context.pop();
             },
-            child: Text('delete'.tr, style: const TextStyle(color: Colors.white)),
+            child: Text('delete'.tr, style: const TextStyle(color: AppColors.white)),
           ),
         ],
       ),
@@ -299,6 +299,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         elevation: 0,
       ),
       body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         padding: EdgeInsets.all(16.w),
         child: Form(
           key: _formKey,
@@ -719,7 +720,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
           style: TextStyle(
             fontSize: 11.sp,
             fontWeight: FontWeight.w700,
-            color: active ? Colors.white : themeService.subtextColor,
+            color: active ? AppColors.white : themeService.subtextColor,
           ),
         ),
       ),

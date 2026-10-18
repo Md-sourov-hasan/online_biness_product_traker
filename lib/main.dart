@@ -43,6 +43,9 @@ class MyApp extends StatelessWidget {
         locale: themeService.currentLocale.value,
         fallbackLocale: const Locale('en', 'US'),
         theme: themeService.themeData,
+        scrollBehavior: const MaterialScrollBehavior().copyWith(
+          physics: const BouncingScrollPhysics(),
+        ),
         builder: (context, child) {
           Sizer.init(context);
           return child!;

@@ -159,11 +159,22 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
             final list = controller.purchases;
             if (list.isEmpty) {
               return Center(
-                child: Text('No purchase records yet.', style: TextStyle(color: themeService.subtextColor)),
+                child: Padding(
+                  padding: EdgeInsets.all(24.w),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.inventory_2_outlined, size: 48.w, color: themeService.subtextColor),
+                      12.verticalSpace,
+                      Text('No purchase records yet.', style: TextStyle(color: themeService.subtextColor, fontSize: 14.sp)),
+                    ],
+                  ),
+                ),
               );
             }
 
             return ListView.separated(
+              physics: const BouncingScrollPhysics(),
               padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
               itemCount: list.length,
               separatorBuilder: (c, i) => 10.verticalSpace,
@@ -189,9 +200,12 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
                           Expanded(
                             child: Text(
                               purchase.productName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: getTextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
                             ),
                           ),
+                          8.horizontalSpace,
                           Text(
                             '৳${purchase.totalAmount.toStringAsFixed(0)}',
                             style: getTextStyle(fontSize: 15.sp, fontWeight: FontWeight.w800, color: AppColors.primary),
@@ -211,13 +225,29 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
                             dateStr,
                             style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w400, color: themeService.subtextColor),
                           ),
-                          if (purchase.supplier.isNotEmpty)
-                            Text(
-                              'Supplier: ${purchase.supplier}',
-                              style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w500, color: themeService.subtextColor),
+                          if (purchase.supplier.isNotEmpty) ...[
+                            8.horizontalSpace,
+                            Flexible(
+                              child: Text(
+                                'Supplier: ${purchase.supplier}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.end,
+                                style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w500, color: themeService.subtextColor),
+                              ),
                             ),
+                          ],
                         ],
                       ),
+                      if (purchase.notes.isNotEmpty) ...[
+                        4.verticalSpace,
+                        Text(
+                          'Note: ${purchase.notes}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w400, color: themeService.subtextColor),
+                        ),
+                      ],
                     ],
                   ),
                 );
@@ -292,6 +322,7 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
         SizedBox(
           height: 32.h,
           child: ListView(
+            physics: const BouncingScrollPhysics(),
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.symmetric(horizontal: 16.w),
             children: ['All', ...AppConstants.expenseCategories].map((cat) {
@@ -331,16 +362,28 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
             final list = controller.filteredExpenses;
             if (list.isEmpty) {
               return Center(
-                child: Text(
-                  isStaffView
-                      ? 'No expenses submitted by you in the last 30 days.'
-                      : 'No expenses recorded for this category.',
-                  style: TextStyle(color: themeService.subtextColor),
+                child: Padding(
+                  padding: EdgeInsets.all(24.w),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.receipt_long_outlined, size: 48.w, color: themeService.subtextColor),
+                      12.verticalSpace,
+                      Text(
+                        isStaffView
+                            ? 'No expenses submitted by you in the last 30 days.'
+                            : 'No expenses recorded for this category.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: themeService.subtextColor, fontSize: 14.sp),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }
 
             return ListView.separated(
+              physics: const BouncingScrollPhysics(),
               padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
               itemCount: list.length,
               separatorBuilder: (c, i) => 10.verticalSpace,
@@ -378,9 +421,13 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
                                 children: [
                                   Row(
                                     children: [
-                                      Text(
-                                        expense.category,
-                                        style: getTextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
+                                      Flexible(
+                                        child: Text(
+                                          expense.category,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: getTextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: themeService.textColor),
+                                        ),
                                       ),
                                       if (expense.creatorRole.isNotEmpty) ...[
                                         6.horizontalSpace,
@@ -554,6 +601,7 @@ class _PurchasesExpensesScreenState extends State<PurchasesExpensesScreen> with 
                       SizedBox(
                         height: 28.h,
                         child: ListView.separated(
+                          physics: const BouncingScrollPhysics(),
                           scrollDirection: Axis.horizontal,
                           itemCount: controller.db.suppliers.length,
                           separatorBuilder: (c, i) => 6.horizontalSpace,

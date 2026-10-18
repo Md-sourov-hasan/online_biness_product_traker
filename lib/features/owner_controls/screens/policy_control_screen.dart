@@ -58,6 +58,7 @@ class _PolicyControlScreenState extends State<PolicyControlScreen> {
             _buildAppBar(context, theme),
             Expanded(
               child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

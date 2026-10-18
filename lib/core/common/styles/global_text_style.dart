@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../utils/constants/colors.dart';
 
 TextStyle getTextStyle({
   required double fontSize,
   FontWeight fontWeight = FontWeight.normal,
-  Color color = const Color(0xFF0F172A),
+  Color color = AppColors.textPrimary,
   double? lineHeight,
 }) {
   return GoogleFonts.inter(

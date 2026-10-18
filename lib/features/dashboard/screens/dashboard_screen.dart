@@ -29,6 +29,7 @@ class DashboardScreen extends StatelessWidget {
     return CommonBackgroundScaffold(
       body: SafeArea(
         child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
           child: Obx(() {
             if (perm.isStaff) {
@@ -69,14 +70,14 @@ class DashboardScreen extends StatelessWidget {
           padding: EdgeInsets.all(16.w),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+              colors: AppColors.tealGradient,
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(16.r),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0F766E).withValues(alpha: 0.25),
+                color: AppColors.teal.withValues(alpha: 0.25),
                 blurRadius: 12,
                 offset: const Offset(0, 5),
               ),
@@ -141,7 +142,7 @@ class DashboardScreen extends StatelessWidget {
                 title: 'Check Stock & Price',
                 subtitle: 'View availability',
                 icon: Icons.search_rounded,
-                color: const Color(0xFF0F766E),
+                color: AppColors.teal,
                 theme: themeService,
                 onTap: () => nav.changeTab(1),
               ),
@@ -158,7 +159,7 @@ class DashboardScreen extends StatelessWidget {
                 icon: Icons.receipt_long_rounded,
                 color: AppColors.error,
                 theme: themeService,
-                onTap: () => nav.changeTab(3),
+                onTap: () => context.push(AppRoute.purchasesExpensesScreen),
               ),
             ),
             12.horizontalSpace,
@@ -169,7 +170,7 @@ class DashboardScreen extends StatelessWidget {
                 icon: Icons.history_rounded,
                 color: AppColors.secondary,
                 theme: themeService,
-                onTap: () => nav.changeTab(3),
+                onTap: () => context.push(AppRoute.purchasesExpensesScreen),
               ),
             ),
           ],
@@ -292,7 +293,7 @@ class DashboardScreen extends StatelessWidget {
           padding: EdgeInsets.all(16.w),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
+              colors: AppColors.primaryGradient,
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -366,10 +367,10 @@ class DashboardScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(child: _buildActionItem('New Sale', Icons.point_of_sale_rounded, AppColors.primary, () => nav.changeTab(2), themeService)),
-            Expanded(child: _buildActionItem('Restock', Icons.add_shopping_cart_rounded, AppColors.secondary, () => nav.changeTab(3), themeService)),
+            Expanded(child: _buildActionItem('Restock', Icons.add_shopping_cart_rounded, AppColors.secondary, () => context.push(AppRoute.purchasesExpensesScreen), themeService)),
             Expanded(child: _buildActionItem('Add SKU', Icons.add_box_rounded, AppColors.warning, () => context.push(AppRoute.addEditProductScreen), themeService)),
-            Expanded(child: _buildActionItem('Discounts', Icons.discount_rounded, const Color(0xFF8B5CF6), () => context.push(AppRoute.discountManagementScreen), themeService)),
-            Expanded(child: _buildActionItem('Suppliers', Icons.local_shipping_rounded, const Color(0xFF0F766E), () => context.push(AppRoute.supplierManagementScreen), themeService)),
+            Expanded(child: _buildActionItem('Discounts', Icons.discount_rounded, AppColors.purple, () => context.push(AppRoute.discountManagementScreen), themeService)),
+            Expanded(child: _buildActionItem('Suppliers', Icons.local_shipping_rounded, AppColors.teal, () => context.push(AppRoute.supplierManagementScreen), themeService)),
           ],
         ),
         24.verticalSpace,
@@ -595,7 +596,7 @@ class DashboardScreen extends StatelessWidget {
         padding: EdgeInsets.all(16.w),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF1E3A8A), Color(0xFF2563EB)],
+            colors: AppColors.blueGradient,
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -698,7 +699,7 @@ class DashboardScreen extends StatelessWidget {
               style: getTextStyle(
                 fontSize: 14.sp,
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFFFACC15),
+                color: AppColors.yellow,
               ),
             ),
             12.verticalSpace,
@@ -1024,9 +1025,9 @@ class DashboardScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(child: _buildActionItem('action_new_sale'.tr, Icons.point_of_sale_rounded, AppColors.primary, () => nav.changeTab(2), themeService)),
-            Expanded(child: _buildActionItem('action_purchase'.tr, Icons.add_shopping_cart_rounded, AppColors.secondary, () => nav.changeTab(3), themeService)),
+            Expanded(child: _buildActionItem('action_purchase'.tr, Icons.add_shopping_cart_rounded, AppColors.secondary, () => context.push(AppRoute.purchasesExpensesScreen), themeService)),
             Expanded(child: _buildActionItem('action_add_product'.tr, Icons.add_box_rounded, AppColors.warning, () => context.push(AppRoute.addEditProductScreen), themeService)),
-            Expanded(child: _buildActionItem('action_reports'.tr, Icons.pie_chart_rounded, const Color(0xFF8B5CF6), () => nav.changeTab(4), themeService)),
+            Expanded(child: _buildActionItem('action_reports'.tr, Icons.pie_chart_rounded, AppColors.purple, () => context.push(AppRoute.reportsScreen), themeService)),
           ],
         ),
         12.verticalSpace,
@@ -1034,9 +1035,9 @@ class DashboardScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Expanded(child: _buildActionItem('Policies', Icons.shield_rounded, AppColors.primary, () => context.push(AppRoute.policyControlScreen), themeService)),
-            Expanded(child: _buildActionItem('Discounts', Icons.discount_rounded, const Color(0xFFE11D48), () => context.push(AppRoute.discountManagementScreen), themeService)),
-            Expanded(child: _buildActionItem('Suppliers', Icons.local_shipping_rounded, const Color(0xFF0F766E), () => context.push(AppRoute.supplierManagementScreen), themeService)),
-            Expanded(child: _buildActionItem('Audit Logs', Icons.history_edu_rounded, const Color(0xFF64748B), () => context.push(AppRoute.activityLogsScreen), themeService)),
+            Expanded(child: _buildActionItem('Discounts', Icons.discount_rounded, AppColors.rose, () => context.push(AppRoute.discountManagementScreen), themeService)),
+            Expanded(child: _buildActionItem('Suppliers', Icons.local_shipping_rounded, AppColors.teal, () => context.push(AppRoute.supplierManagementScreen), themeService)),
+            Expanded(child: _buildActionItem('Audit Logs', Icons.history_edu_rounded, AppColors.textSecondary, () => context.push(AppRoute.activityLogsScreen), themeService)),
           ],
         ),
       ],

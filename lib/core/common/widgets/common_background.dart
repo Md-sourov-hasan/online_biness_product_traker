@@ -18,15 +18,23 @@ class CommonBackgroundScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color bgColor = Theme.of(context).scaffoldBackgroundColor;
-    try {
-      if (Get.isRegistered<ThemeLanguageService>()) {
-        bgColor = Get.find<ThemeLanguageService>().backgroundColor;
-      }
-    } catch (_) {}
+    if (Get.isRegistered<ThemeLanguageService>()) {
+      return Obx(() {
+        final theme = Get.find<ThemeLanguageService>();
+        return Scaffold(
+          backgroundColor: theme.backgroundColor,
+          appBar: appBar,
+          bottomNavigationBar: bottomNavigationBar,
+          floatingActionButton: floatingActionButton,
+          body: SafeArea(
+            child: body,
+          ),
+        );
+      });
+    }
 
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: appBar,
       bottomNavigationBar: bottomNavigationBar,
       floatingActionButton: floatingActionButton,

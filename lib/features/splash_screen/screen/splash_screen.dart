@@ -52,11 +52,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A), // Dark slate void
+      backgroundColor: AppColors.darkBackground,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF0F172A), Color(0xFF1E3A8A)],
+            colors: AppColors.splashGradient,
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -86,7 +86,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     child: Icon(
                       Icons.inventory_2_rounded,
                       size: 54.w,
-                      color: Colors.white,
+                      color: AppColors.white,
                     ),
                   ),
                   24.verticalSpace,
@@ -95,7 +95,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     style: getTextStyle(
                       fontSize: 34.sp,
                       fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                      color: AppColors.white,
                     ),
                   ),
                   8.verticalSpace,
@@ -105,7 +105,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     style: getTextStyle(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.w400,
-                      color: Colors.white.withValues(alpha: 0.8),
+                      color: AppColors.white.withValues(alpha: 0.8),
                     ),
                   ),
                   48.verticalSpace,

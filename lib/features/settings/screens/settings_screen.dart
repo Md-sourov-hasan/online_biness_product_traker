@@ -10,6 +10,7 @@ import '../../../core/utils/sizer.dart';
 import '../../../core/utils/constants/colors.dart';
 import '../../../core/common/styles/global_text_style.dart';
 import '../../../core/common/widgets/common_background.dart';
+import '../../../core/common/widgets/stockmate_components.dart';
 import '../../../routes/app_routes.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -36,6 +37,7 @@ class SettingsScreen extends StatelessWidget {
         elevation: 0,
       ),
       body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -44,10 +46,14 @@ class SettingsScreen extends StatelessWidget {
             _buildUserProfileCard(auth, perm, themeService),
             20.verticalSpace,
 
-            // 2. 3-Tier Theme Engine (Light, Dark, Midnight)
-            _buildSectionHeader('theme_title'.tr, Icons.palette_rounded, themeService),
+            // 2. Appearance & Theme Entry Row (Themes Spec Section 7.1)
+            _buildSectionHeader('Appearance & Theme', Icons.palette_rounded, themeService),
             8.verticalSpace,
-            _buildThemeSelector(controller, themeService),
+            _buildAppearanceThemeRow(context, themeService),
+            12.verticalSpace,
+
+            // Quick Access: Analytics Tile (Analytics Spec Section 1.1)
+            _buildAnalyticsTile(context, themeService),
             20.verticalSpace,
 
             // 3. Language Selector (English / বাংলা)
@@ -314,97 +320,131 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  // --- 2. 3-Tier Theme Selector ---
-  Widget _buildThemeSelector(SettingsController controller, ThemeLanguageService themeService) {
+  // --- Section 7.1 Entry row on the More / Settings screen ---
+  Widget _buildAppearanceThemeRow(BuildContext context, ThemeLanguageService themeService) {
     return Obx(() {
-      final currentMode = themeService.currentThemeMode.value;
-      return Container(
-        padding: EdgeInsets.all(12.w),
-        decoration: BoxDecoration(
-          color: themeService.cardColor,
-          borderRadius: BorderRadius.circular(16.r),
-        ),
-        child: Row(
-          children: [
-            _buildThemeOption(
-              label: 'theme_light'.tr,
-              icon: Icons.wb_sunny_rounded,
-              isSelected: currentMode == AppThemeMode.light,
-              onTap: () => controller.changeTheme(AppThemeMode.light),
-              color: const Color(0xFFF8FAFC),
-              textColor: const Color(0xFF0F172A),
-              themeService: themeService,
-            ),
-            8.horizontalSpace,
-            _buildThemeOption(
-              label: 'theme_dark'.tr,
-              icon: Icons.dark_mode_rounded,
-              isSelected: currentMode == AppThemeMode.dark,
-              onTap: () => controller.changeTheme(AppThemeMode.dark),
-              color: const Color(0xFF1E293B),
-              textColor: Colors.white,
-              themeService: themeService,
-            ),
-            8.horizontalSpace,
-            _buildThemeOption(
-              label: 'theme_midnight'.tr,
-              icon: Icons.nightlight_round,
-              isSelected: currentMode == AppThemeMode.midnight,
-              onTap: () => controller.changeTheme(AppThemeMode.midnight),
-              color: const Color(0xFF0E1626),
-              textColor: const Color(0xFF38BDF8),
-              themeService: themeService,
-            ),
-          ],
+      final t = themeService.t;
+      return GestureDetector(
+        onTap: () => context.push(AppRoute.themeScreen),
+        child: Container(
+          padding: EdgeInsets.all(14.w),
+          decoration: BoxDecoration(
+            color: themeService.cardColor,
+            borderRadius: BorderRadius.circular(16.r),
+            border: Border.all(color: t.border, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: t.shadow,
+                blurRadius: 12,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Mini preview 40 × 40 (Themes Spec Section 7.4, variant S)
+              ThemePreviewTile(
+                theme: t,
+                activeTheme: t,
+                variant: PreviewVariant.S,
+              ),
+              12.horizontalSpace,
+              // Text block: palette icon + "Appearance & Theme", below it active theme name
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.palette_rounded, size: 14.w, color: t.accent),
+                        6.horizontalSpace,
+                        Text(
+                          'Appearance & Theme',
+                          style: TextStyle(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w700,
+                            color: t.text,
+                          ),
+                        ),
+                      ],
+                    ),
+                    2.verticalSpace,
+                    Text(
+                      t.name,
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w600,
+                        color: t.accent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Right: Three colour dots 10 × 10 (accent, success, warning of the active theme; gap 4) and a “›” chevron (18 px, textSec)
+              Row(
+                children: [
+                  Container(width: 10.w, height: 10.w, decoration: BoxDecoration(shape: BoxShape.circle, color: t.accent)),
+                  4.horizontalSpace,
+                  Container(width: 10.w, height: 10.w, decoration: BoxDecoration(shape: BoxShape.circle, color: t.success)),
+                  4.horizontalSpace,
+                  Container(width: 10.w, height: 10.w, decoration: BoxDecoration(shape: BoxShape.circle, color: t.warning)),
+                  8.horizontalSpace,
+                  Text('›', style: TextStyle(fontSize: 18.sp, color: t.textSec, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ],
+          ),
         ),
       );
     });
   }
 
-  Widget _buildThemeOption({
-    required String label,
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required Color color,
-    required Color textColor,
-    required ThemeLanguageService themeService,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
+  // --- Quick Access: Analytics Tile (Analytics Spec Section 1.1) ---
+  Widget _buildAnalyticsTile(BuildContext context, ThemeLanguageService themeService) {
+    return Obx(() {
+      final t = themeService.t;
+      return GestureDetector(
+        onTap: () => context.push(AppRoute.analyticsScreen),
         child: Container(
-          padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 6.w),
+          padding: EdgeInsets.all(14.w),
           decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(12.r),
-            border: Border.all(
-              color: isSelected ? AppColors.primary : themeService.inputBorderColor,
-              width: isSelected ? 2 : 1,
-            ),
+            color: t.purpleLight,
+            borderRadius: BorderRadius.circular(16.r),
+            border: Border.all(color: t.purple.withValues(alpha: 0.3), width: 1.5),
           ),
-          child: Column(
+          child: Row(
             children: [
-              Icon(icon, color: isSelected ? AppColors.primary : textColor, size: 22.w),
-              6.verticalSpace,
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  style: getTextStyle(
-                    fontSize: 11.sp,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    color: isSelected ? AppColors.primary : textColor,
-                  ),
+              Container(
+                padding: EdgeInsets.all(8.w),
+                decoration: BoxDecoration(
+                  color: t.purple.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
+                child: Icon(Icons.trending_up_rounded, color: t.purple, size: 22.w),
+              ),
+              12.horizontalSpace,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Analytics',
+                      style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, color: t.purple),
+                    ),
+                    2.verticalSpace,
+                    Text(
+                      'Charts & trends • Annual revenue & KPIs',
+                      style: TextStyle(fontSize: 11.sp, color: t.textSec),
+                    ),
+                  ],
                 ),
               ),
+              Icon(Icons.arrow_forward_ios_rounded, size: 14.w, color: t.purple),
             ],
           ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   // --- 3. Language Selector ---
@@ -494,7 +534,7 @@ class SettingsScreen extends StatelessWidget {
             icon: Icons.local_offer_rounded,
             title: 'Discount Rules & Approvals',
             subtitle: 'Manager requests & Owner approval workflow',
-            iconColor: const Color(0xFF8B5CF6),
+            iconColor: AppColors.purple,
             themeService: themeService,
             onTap: () => context.push(AppRoute.discountManagementScreen),
           ),
@@ -513,7 +553,7 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.pie_chart_rounded,
               title: 'Investor Management',
               subtitle: 'Cap table, equity, profit distributions',
-              iconColor: const Color(0xFFF59E0B),
+              iconColor: AppColors.warning,
               themeService: themeService,
               onTap: () => context.push(AppRoute.investorManagementScreen),
             ),
@@ -522,7 +562,7 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.account_balance_rounded,
               title: 'Borrowed Loans (Liabilities)',
               subtitle: 'Principal repayment & interest expense',
-              iconColor: const Color(0xFFEF4444),
+              iconColor: AppColors.error,
               themeService: themeService,
               onTap: () => context.push(AppRoute.loanManagementScreen),
             ),
@@ -531,7 +571,7 @@ class SettingsScreen extends StatelessWidget {
               icon: Icons.handshake_rounded,
               title: 'Money Lent (Receivables)',
               subtitle: 'Debtor tracking & interest earnings',
-              iconColor: const Color(0xFF10B981),
+              iconColor: AppColors.secondary,
               themeService: themeService,
               onTap: () => context.push(AppRoute.moneyLentScreen),
             ),
@@ -596,25 +636,46 @@ class SettingsScreen extends StatelessWidget {
     required ThemeLanguageService themeService,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      onTap: onTap,
-      leading: Container(
-        padding: EdgeInsets.all(8.w),
-        decoration: BoxDecoration(
-          color: iconColor.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(10.r),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        splashColor: iconColor.withValues(alpha: 0.12),
+        highlightColor: iconColor.withValues(alpha: 0.06),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+          child: Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8.w),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
+                child: Icon(icon, color: iconColor, size: 22.w),
+              ),
+              14.horizontalSpace,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: getTextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: themeService.textColor),
+                    ),
+                    2.verticalSpace,
+                    Text(
+                      subtitle,
+                      style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w400, color: themeService.subtextColor),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: themeService.subtextColor, size: 20.w),
+            ],
+          ),
         ),
-        child: Icon(icon, color: iconColor, size: 22.w),
       ),
-      title: Text(
-        title,
-        style: getTextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: themeService.textColor),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: getTextStyle(fontSize: 11.sp, fontWeight: FontWeight.w400, color: themeService.subtextColor),
-      ),
-      trailing: Icon(Icons.chevron_right_rounded, color: themeService.subtextColor, size: 20.w),
     );
   }
 

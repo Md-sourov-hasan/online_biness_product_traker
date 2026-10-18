@@ -82,6 +82,7 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
   // ===========================================================================
   Widget _buildPosTab() {
     return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -99,10 +100,10 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
             return Container(
               padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
               decoration: BoxDecoration(
-                color: (skuExceeded || unitExceeded) ? Colors.redAccent.withValues(alpha: 0.1) : themeService.cardColor,
+                color: (skuExceeded || unitExceeded) ? AppColors.error.withValues(alpha: 0.1) : themeService.cardColor,
                 borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(
-                  color: (skuExceeded || unitExceeded) ? Colors.redAccent : themeService.inputBorderColor,
+                  color: (skuExceeded || unitExceeded) ? AppColors.error : themeService.inputBorderColor,
                   width: 0.8,
                 ),
               ),
@@ -111,28 +112,28 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.inventory_2_outlined, size: 18.w, color: skuExceeded ? Colors.redAccent : AppColors.primary),
+                      Icon(Icons.inventory_2_outlined, size: 18.w, color: skuExceeded ? AppColors.error : AppColors.primary),
                       8.horizontalSpace,
                       Text(
                         'SKUs: $skuCount / $maxSkus max',
                         style: TextStyle(
                           fontSize: 12.sp,
                           fontWeight: FontWeight.w600,
-                          color: skuExceeded ? Colors.redAccent : themeService.textColor,
+                          color: skuExceeded ? AppColors.error : themeService.textColor,
                         ),
                       ),
                     ],
                   ),
                   Row(
                     children: [
-                      Icon(Icons.shopping_bag_outlined, size: 18.w, color: unitExceeded ? Colors.redAccent : AppColors.secondary),
+                      Icon(Icons.shopping_bag_outlined, size: 18.w, color: unitExceeded ? AppColors.error : AppColors.secondary),
                       8.horizontalSpace,
                       Text(
                         'Total Units: $unitCount / $maxUnits max',
                         style: TextStyle(
                           fontSize: 12.sp,
                           fontWeight: FontWeight.w600,
-                          color: unitExceeded ? Colors.redAccent : themeService.textColor,
+                          color: unitExceeded ? AppColors.error : themeService.textColor,
                         ),
                       ),
                     ],
@@ -214,7 +215,7 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
                     Text('Cart Items (${cart.length})', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: themeService.textColor)),
                     TextButton(
                       onPressed: () => controller.cart.clear(),
-                      child: const Text('Clear All', style: TextStyle(color: Colors.redAccent)),
+                      child: const Text('Clear All', style: TextStyle(color: AppColors.error)),
                     ),
                   ],
                 ),
@@ -292,8 +293,8 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Authorized Discount:', style: TextStyle(fontSize: 13.sp, color: Colors.green)),
-                        Text('-৳${disc.toStringAsFixed(0)}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: Colors.green)),
+                        Text('Authorized Discount:', style: TextStyle(fontSize: 13.sp, color: AppColors.success)),
+                        Text('-৳${disc.toStringAsFixed(0)}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.success)),
                       ],
                     ),
                   ],
@@ -355,14 +356,14 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
                 Text('Unit: ৳${item.unitPrice.toStringAsFixed(0)} • Total: ৳${item.netLineTotal.toStringAsFixed(0)}',
                     style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w600)),
                 if (item.discount > 0)
-                  Text('Discount: -৳${item.discount.toStringAsFixed(0)}', style: TextStyle(fontSize: 11.sp, color: Colors.green)),
+                  Text('Discount: -৳${item.discount.toStringAsFixed(0)}', style: TextStyle(fontSize: 11.sp, color: AppColors.success)),
               ],
             ),
           ),
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.remove_circle_outline, size: 20, color: Colors.redAccent),
+                icon: const Icon(Icons.remove_circle_outline, size: 20, color: AppColors.error),
                 onPressed: () => controller.updateCartItemQuantity(index, item.quantity - 1),
               ),
               Text('${item.quantity}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: themeService.textColor)),
@@ -411,6 +412,7 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
             }
 
             return ListView.separated(
+              physics: const BouncingScrollPhysics(),
               padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
               itemCount: salesList.length,
               separatorBuilder: (c, i) => 10.verticalSpace,
@@ -472,8 +474,8 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
                               icon: const Icon(Icons.replay, size: 14),
                               label: const Text('Return / Exchange'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                foregroundColor: Colors.white,
+                                backgroundColor: AppColors.warning,
+                                foregroundColor: AppColors.white,
                                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
                               ),
                             ),
@@ -536,38 +538,42 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
                   }
 
                   return ListView.separated(
+                    physics: const BouncingScrollPhysics(),
                     itemCount: list.length,
                     separatorBuilder: (c, i) => Divider(color: themeService.inputBorderColor),
                     itemBuilder: (context, index) {
                       final product = list[index];
                       final isOut = product.quantity <= 0;
 
-                      return ListTile(
-                        onTap: isOut
-                            ? null
-                            : () {
-                                controller.addToCart(product);
-                                Navigator.pop(ctx);
-                              },
-                        leading: CircleAvatar(
-                          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                          child: Icon(Icons.inventory_2_rounded, color: AppColors.primary, size: 20.w),
-                        ),
-                        title: Text(product.displayName, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: themeService.textColor)),
-                        // Staff sees ONLY selling price per Spec Section 6.2 & 6.4!
-                        subtitle: Text(
-                          'Selling Price: ৳${product.sellingPrice.toStringAsFixed(0)}${!perm.isStaff ? " (Cost: ৳${product.pricePerPiece.toStringAsFixed(0)})" : ""}',
-                          style: TextStyle(color: themeService.subtextColor, fontSize: 11.sp),
-                        ),
-                        trailing: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                          decoration: BoxDecoration(
-                            color: isOut ? AppColors.error.withValues(alpha: 0.1) : AppColors.secondary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6.r),
+                      return Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          onTap: isOut
+                              ? null
+                              : () {
+                                  controller.addToCart(product);
+                                  Navigator.pop(ctx);
+                                },
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                            child: Icon(Icons.inventory_2_rounded, color: AppColors.primary, size: 20.w),
                           ),
-                          child: Text(
-                            isOut ? 'Out of Stock' : '${product.quantity} left',
-                            style: TextStyle(color: isOut ? AppColors.error : AppColors.secondary, fontSize: 11.sp, fontWeight: FontWeight.w700),
+                          title: Text(product.displayName, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: themeService.textColor)),
+                          // Staff sees ONLY selling price per Spec Section 6.2 & 6.4!
+                          subtitle: Text(
+                            'Selling Price: ৳${product.sellingPrice.toStringAsFixed(0)}${!perm.isStaff ? " (Cost: ৳${product.pricePerPiece.toStringAsFixed(0)})" : ""}',
+                            style: TextStyle(color: themeService.subtextColor, fontSize: 11.sp),
+                          ),
+                          trailing: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                            decoration: BoxDecoration(
+                              color: isOut ? AppColors.error.withValues(alpha: 0.1) : AppColors.secondary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6.r),
+                            ),
+                            child: Text(
+                              isOut ? 'Out of Stock' : '${product.quantity} left',
+                              style: TextStyle(color: isOut ? AppColors.error : AppColors.secondary, fontSize: 11.sp, fontWeight: FontWeight.w700),
+                            ),
                           ),
                         ),
                       );
@@ -632,8 +638,8 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Discounts:', style: TextStyle(fontSize: 12.sp, color: Colors.green)),
-                    Text('-৳${totalDiscounts.toStringAsFixed(0)}', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: Colors.green)),
+                    Text('Discounts:', style: TextStyle(fontSize: 12.sp, color: AppColors.success)),
+                    Text('-৳${totalDiscounts.toStringAsFixed(0)}', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.success)),
                   ],
                 ),
               4.verticalSpace,

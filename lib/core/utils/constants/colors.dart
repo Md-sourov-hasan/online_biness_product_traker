@@ -19,6 +19,29 @@ class AppColors {
   static const Color error = Color(0xFFEF4444); // Rose Red
   static const Color warning = Color(0xFFF59E0B); // Amber
   static const Color info = Color(0xFF06B6D4); // Cyan
+  static const Color purple = Color(0xFF8B5CF6); // Violet / Purple
+  static const Color purpleLight = Color(0xFFEDE9FE);
+  static const Color teal = Color(0xFF0F766E); // Deep Teal
+  static const Color tealLight = Color(0xFF14B8A6); // Cyan / Teal Light
+  static const Color rose = Color(0xFFE11D48); // Vivid Rose
+  static const Color yellow = Color(0xFFFACC15); // Vibrant Yellow
+
+  // Role accents
+  static const Color roleOwner = Color(0xFF2563EB); // Royal Blue
+  static const Color roleManager = Color(0xFFF59E0B); // Amber
+  static const Color roleStaff = Color(0xFF8B5CF6); // Purple
+
+  // Universal Neutral / Utility Colors
+  static const Color white = Color(0xFFFFFFFF);
+  static const Color black = Color(0xFF000000);
+  static const Color transparent = Color(0x00000000);
+  static const Color modalOverlay = Color(0x59000000); // 35% black scrim
+
+  // Gradients
+  static const List<Color> splashGradient = [Color(0xFF0F172A), Color(0xFF1E3A8A)];
+  static const List<Color> primaryGradient = [Color(0xFF1E3A8A), Color(0xFF3B82F6)];
+  static const List<Color> tealGradient = [Color(0xFF0F766E), Color(0xFF14B8A6)];
+  static const List<Color> blueGradient = [Color(0xFF1E3A8A), Color(0xFF2563EB)];
 
   // Light Theme Colors
   static const Color textPrimary = Color(0xFF0F172A); // Slate 900

@@ -14,6 +14,10 @@ import '../features/owner_controls/screens/policy_control_screen.dart';
 import '../features/owner_controls/screens/discount_management_screen.dart';
 import '../features/owner_controls/screens/supplier_management_screen.dart';
 import '../features/auth/screens/login_screen.dart';
+import '../features/settings/screens/theme_settings_screen.dart';
+import '../features/reports/screens/analytics_screen.dart';
+import '../features/reports/screens/reports_screen.dart';
+import '../features/purchases_expenses/screens/purchases_expenses_screen.dart';
 import '../core/models/product_model.dart';
 
 class AppRoute {
@@ -28,6 +32,10 @@ class AppRoute {
   static const String userManagementScreen = "/user-management";
   static const String backupSyncScreen = "/backup-sync";
   static const String activityLogsScreen = "/activity-logs";
+  static const String themeScreen = "/theme";
+  static const String analyticsScreen = "/analytics";
+  static const String reportsScreen = "/reports";
+  static const String purchasesExpensesScreen = "/purchases-expenses";
 
   // Owner & Governance Routes
   static const String investorManagementScreen = "/investors";
@@ -153,6 +161,38 @@ class AppRoute {
           context: context,
           state: state,
           child: const SupplierManagementScreen(),
+        ),
+      ),
+      GoRoute(
+        path: themeScreen,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const ThemeSettingsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: analyticsScreen,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const AnalyticsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: reportsScreen,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const ReportsScreen(),
+        ),
+      ),
+      GoRoute(
+        path: purchasesExpensesScreen,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const PurchasesExpensesScreen(),
         ),
       ),
     ],

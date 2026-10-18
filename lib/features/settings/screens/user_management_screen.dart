@@ -37,6 +37,7 @@ class UserManagementScreen extends StatelessWidget {
         elevation: 0,
       ),
       body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

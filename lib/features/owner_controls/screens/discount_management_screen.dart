@@ -34,6 +34,7 @@ class DiscountManagementScreen extends StatelessWidget {
                 final pendingRules = rules.where((r) => r.status == 'pending').toList();
 
                 return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
                   padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,10 +47,15 @@ class DiscountManagementScreen extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Discount Rules & Authorizations',
-                            style: getTextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: theme.textColor),
+                          Expanded(
+                            child: Text(
+                              'Discount Rules & Authorizations',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: getTextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, color: theme.textColor),
+                            ),
                           ),
+                          8.horizontalSpace,
                           ElevatedButton.icon(
                             onPressed: () => _showRequestDiscountDialog(context, db, auth, theme),
                             icon: const Icon(Icons.add, size: 18),
@@ -144,13 +150,12 @@ class DiscountManagementScreen extends StatelessWidget {
         border: Border.all(color: theme.inputBorderColor, width: 0.5),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildCountBadge('Currently Active', active, AppColors.success, theme),
+          Expanded(child: _buildCountBadge('Currently Active', active, AppColors.success, theme)),
           Container(width: 1, height: 35, color: theme.inputBorderColor),
-          _buildCountBadge('Pending Owner Approval', pending, Colors.orange, theme),
+          Expanded(child: _buildCountBadge('Pending Approval', pending, Colors.orange, theme)),
           Container(width: 1, height: 35, color: theme.inputBorderColor),
-          _buildCountBadge('Total Rules', total, AppColors.primary, theme),
+          Expanded(child: _buildCountBadge('Total Rules', total, AppColors.primary, theme)),
         ],
       ),
     );
@@ -161,7 +166,13 @@ class DiscountManagementScreen extends StatelessWidget {
       children: [
         Text(count.toString(), style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: color)),
         4.verticalSpace,
-        Text(label, style: TextStyle(fontSize: 10.sp, color: theme.subtextColor)),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 10.sp, color: theme.subtextColor),
+        ),
       ],
     );
   }
@@ -237,8 +248,16 @@ class DiscountManagementScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('Scope:', style: TextStyle(fontSize: 12.sp, color: theme.subtextColor)),
-                    Text('${rule.scope.toUpperCase()}${rule.targetValue.isNotEmpty ? " (${rule.targetValue})" : ""}',
-                        style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: theme.textColor)),
+                    8.horizontalSpace,
+                    Flexible(
+                      child: Text(
+                        '${rule.scope.toUpperCase()}${rule.targetValue.isNotEmpty ? " (${rule.targetValue})" : ""}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: theme.textColor),
+                      ),
+                    ),
                   ],
                 ),
                 4.verticalSpace,
@@ -256,7 +275,16 @@ class DiscountManagementScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Requested By:', style: TextStyle(fontSize: 11.sp, color: theme.subtextColor)),
-                      Text(rule.requesterName, style: TextStyle(fontSize: 11.sp, color: theme.textColor)),
+                      8.horizontalSpace,
+                      Flexible(
+                        child: Text(
+                          rule.requesterName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                          style: TextStyle(fontSize: 11.sp, color: theme.textColor),
+                        ),
+                      ),
                     ],
                   ),
                 ],

@@ -35,6 +35,7 @@ class CustomTextField extends StatelessWidget {
     Color subtextColor = AppColors.textSecondary;
     Color fillColor = AppColors.inputBackground;
     Color borderColor = AppColors.inputBorder;
+    Color accentColor = AppColors.primary;
 
     try {
       if (Get.isRegistered<ThemeLanguageService>()) {
@@ -43,6 +44,7 @@ class CustomTextField extends StatelessWidget {
         subtextColor = ts.subtextColor;
         fillColor = ts.inputFillColor;
         borderColor = ts.inputBorderColor;
+        accentColor = ts.accentColor;
       }
     } catch (_) {}
 
@@ -94,7 +96,7 @@ class CustomTextField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.r),
-              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+              borderSide: BorderSide(color: accentColor, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12.r),

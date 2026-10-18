@@ -3,7 +3,7 @@ import '../../../core/services/database_service.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/theme_language_service.dart';
 import '../../../core/services/backup_service.dart';
-import '../../../core/utils/constants/colors.dart';
+import '../../../core/theme/stockmate_theme.dart';
 
 class SettingsController extends GetxController {
   final DatabaseService db = Get.find<DatabaseService>();
@@ -11,7 +11,7 @@ class SettingsController extends GetxController {
   final ThemeLanguageService themeService = Get.find<ThemeLanguageService>();
   final BackupService backupService = Get.find<BackupService>();
 
-  void changeTheme(AppThemeMode mode) {
+  void changeTheme(StockMateThemeMode mode) {
     themeService.setTheme(mode);
   }
 

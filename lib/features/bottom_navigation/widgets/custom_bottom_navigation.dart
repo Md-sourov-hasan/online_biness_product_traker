@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../core/services/theme_language_service.dart';
-import '../../../core/services/permission_service.dart';
-import '../../../core/utils/constants/colors.dart';
 import '../../../core/utils/sizer.dart';
 
 class CustomBottomNavBar extends StatelessWidget {
@@ -18,51 +16,36 @@ class CustomBottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeLanguageService themeService = Get.find<ThemeLanguageService>();
-    final PermissionService perm = Get.find<PermissionService>();
 
     return Obx(() {
-      final isStaff = perm.isStaff;
+      final t = themeService.t;
 
       return Container(
+        height: 64.h,
         decoration: BoxDecoration(
-          color: themeService.cardColor,
+          color: t.nav,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, -3),
+              color: t.shadow,
+              blurRadius: 20,
+              offset: const Offset(0, -4),
             ),
           ],
           border: Border(
-            top: BorderSide(color: themeService.inputBorderColor, width: 0.5),
+            top: BorderSide(color: t.border, width: 1),
           ),
         ),
         child: SafeArea(
+          top: false,
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
+            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Expanded(child: _buildNavItem(0, Icons.dashboard_rounded, 'nav_dashboard'.tr, themeService)),
-                Expanded(
-                  child: _buildNavItem(
-                    1,
-                    Icons.inventory_2_rounded,
-                    isStaff ? 'Check Stock' : 'nav_inventory'.tr,
-                    themeService,
-                  ),
-                ),
-                Expanded(child: _buildNavItem(2, Icons.point_of_sale_rounded, 'nav_sales'.tr, themeService)),
-                Expanded(
-                  child: _buildNavItem(
-                    3,
-                    Icons.receipt_long_rounded,
-                    isStaff ? 'My Expenses' : 'nav_purchases_expenses'.tr,
-                    themeService,
-                  ),
-                ),
-                if (!isStaff)
-                  Expanded(child: _buildNavItem(4, Icons.analytics_rounded, 'nav_reports'.tr, themeService)),
+                Expanded(child: _buildNavItem(0, Icons.dashboard_rounded, 'Dashboard', themeService)),
+                Expanded(child: _buildNavItem(1, Icons.inventory_2_rounded, 'Inventory', themeService)),
+                Expanded(child: _buildNavItem(2, Icons.point_of_sale_rounded, 'Sales & POS', themeService)),
+                Expanded(child: _buildNavItem(3, Icons.grid_view_rounded, 'More', themeService)),
               ],
             ),
           ),
@@ -72,26 +55,29 @@ class CustomBottomNavBar extends StatelessWidget {
   }
 
   Widget _buildNavItem(int index, IconData icon, String label, ThemeLanguageService themeService) {
+    final t = themeService.t;
     final isSelected = currentIndex == index;
+
     return GestureDetector(
       onTap: () => onTabSelected(index),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 6.h),
+        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withValues(alpha: 0.12) : Colors.transparent,
+          color: isSelected ? t.accentLight : Colors.transparent,
           borderRadius: BorderRadius.circular(12.r),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               icon,
-              color: isSelected ? AppColors.primary : themeService.subtextColor,
-              size: 22.w,
+              color: isSelected ? t.accent : t.textMuted,
+              size: 20.w,
             ),
-            4.verticalSpace,
+            2.verticalSpace,
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
@@ -100,7 +86,7 @@ class CustomBottomNavBar extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10.sp,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? AppColors.primary : themeService.subtextColor,
+                  color: isSelected ? t.accent : t.textMuted,
                 ),
               ),
             ),

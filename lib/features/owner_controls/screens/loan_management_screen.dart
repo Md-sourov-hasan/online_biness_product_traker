@@ -30,6 +30,7 @@ class LoanManagementScreen extends StatelessWidget {
                 final totalInterestPaid = db.loanPayments.fold(0.0, (sum, p) => sum + p.interestPaid);
 
                 return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
                   padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
