@@ -19,7 +19,9 @@ void main() async {
   Get.put(ConnectivityService());
   Get.put(NotificationService());
   await Get.putAsync(() async => DatabaseService());
-  final themeLanguageService = await Get.putAsync(() async => ThemeLanguageService());
+  final themeLanguageService = await Get.putAsync(
+    () async => ThemeLanguageService(),
+  );
   await Get.putAsync(() async => AuthService());
   Get.put(PermissionService());
   Get.put(ReportExportService());

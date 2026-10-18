@@ -37,28 +37,26 @@ class ThemeSettingsScreen extends StatelessWidget {
                           if (context.canPop()) {
                             context.pop();
                           } else {
-                            context.go('/settings');
+                            context.go('/home');
                           }
                         },
                         child: Container(
-                          width: 34,
-                          height: 34,
+                          width: 36,
+                          height: 36,
                           decoration: BoxDecoration(
                             color: t.surfaceAlt,
                             borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: t.border),
                           ),
                           alignment: Alignment.center,
-                          child: Text(
-                            '←',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: t.text,
-                            ),
+                          child: Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 16,
+                            color: t.text,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Text(
                         'Appearance & Theme',
                         style: TextStyle(

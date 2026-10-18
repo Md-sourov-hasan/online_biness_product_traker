@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/models/loan_model.dart';
+import '../../../core/models/receivable_model.dart';
+import '../../../core/models/investor_model.dart';
 import '../../../core/services/theme_language_service.dart';
 import '../../../core/services/database_service.dart';
 import '../../../core/services/permission_service.dart';
@@ -74,14 +77,56 @@ class _ReportsScreenState extends State<ReportsScreen> {
       if (perm.isStaff) {
         return Scaffold(
           backgroundColor: t.bg,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: Center(
+                child: GestureDetector(
+                  onTap: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/home');
+                    }
+                  },
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: t.surfaceAlt,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: t.border),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 16,
+                      color: t.text,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
           body: Center(
             child: Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.lock_person_rounded, size: 56, color: t.danger),
-                  const SizedBox(height: 16),
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: t.dangerLight,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(Icons.lock_person_rounded, size: 44, color: t.danger),
+                  ),
+                  const SizedBox(height: 20),
                   Text(
                     'Financial Reports Restricted',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: t.text),
@@ -90,7 +135,39 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   Text(
                     'Under Section 6 (Role-Based Access Control), Staff accounts do not have permission to view store margins, COGS, or business profit reports.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: t.textSec),
+                    style: TextStyle(fontSize: 13, color: t.textSec, height: 1.4),
+                  ),
+                  const SizedBox(height: 24),
+                  GestureDetector(
+                    onTap: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/home');
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: t.accent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.arrow_back_rounded, size: 16, color: Colors.white),
+                          SizedBox(width: 8),
+                          Text(
+                            'Back to Home',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -118,25 +195,23 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           if (context.canPop()) {
                             context.pop();
                           } else {
-                            context.go('/settings');
+                            context.go('/home');
                           }
                         },
                         child: Container(
-                          width: 34,
-                          height: 34,
-                          margin: const EdgeInsets.only(right: 10),
+                          width: 36,
+                          height: 36,
+                          margin: const EdgeInsets.only(right: 12),
                           decoration: BoxDecoration(
                             color: t.surfaceAlt,
                             borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: t.border),
                           ),
                           alignment: Alignment.center,
-                          child: Text(
-                            '←',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: t.text,
-                            ),
+                          child: Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 16,
+                            color: t.text,
                           ),
                         ),
                       ),
@@ -953,10 +1028,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
 
               // Block 5: 🏦 Loan Liabilities (warningLight / warning)
-              _buildPlLoansBlock(t, currency, liveLoans, totalLoanDebt),
+              _buildPlLoansBlock(t, currency, liveLoans, totalLoanDebt, db),
 
               // Block 6: 🤝 Money Lent Out (accentLight / accent)
-              _buildPlMoneyLentBlock(t, currency, liveReceivables, totalMoneyLent),
+              _buildPlMoneyLentBlock(t, currency, liveReceivables, totalMoneyLent, db),
 
               // Block 7: NET PROFIT Box (gradient purple+22 to accent+22, border purple+44)
               Container(
@@ -1092,7 +1167,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildPlLoansBlock(ThemeTokens t, String currency, List liveLoans, double totalLoanDebt) {
+  Widget _buildPlLoansBlock(ThemeTokens t, String currency, List<Loan> liveLoans, double totalLoanDebt, DatabaseService db) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1115,7 +1190,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
           const SizedBox(height: 4),
           if (liveLoans.isNotEmpty)
             ...liveLoans.map((l) {
-              final isCleared = l.status == 'cleared';
+              final remaining = db.getOutstandingLoanPrincipal(l.id);
+              final isCleared = l.status == 'cleared' || l.status == 'paid' || remaining <= 0;
               return Container(
                 padding: const EdgeInsets.symmetric(vertical: 5),
                 decoration: BoxDecoration(
@@ -1142,7 +1218,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      isCleared ? '✅ Cleared' : '${fmt(l.principalAmount, currency)} left',
+                      isCleared ? '✅ Cleared' : '${fmt(remaining > 0 ? remaining : l.principalBorrowed, currency)} left',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -1214,7 +1290,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildPlMoneyLentBlock(ThemeTokens t, String currency, List liveReceivables, double totalMoneyLent) {
+  Widget _buildPlMoneyLentBlock(ThemeTokens t, String currency, List<Receivable> liveReceivables, double totalMoneyLent, DatabaseService db) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1237,7 +1313,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
           const SizedBox(height: 4),
           if (liveReceivables.isNotEmpty)
             ...liveReceivables.map((r) {
-              final isReturned = r.status == 'returned';
+              final remaining = db.getOutstandingReceivablePrincipal(r.id);
+              final isReturned = r.status == 'returned' || remaining <= 0;
               return Container(
                 padding: const EdgeInsets.symmetric(vertical: 5),
                 decoration: BoxDecoration(
@@ -1253,7 +1330,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         text: TextSpan(
                           style: TextStyle(fontSize: 12, color: t.text, fontFamily: 'SF Pro Display'),
                           children: [
-                            TextSpan(text: r.debtorName),
+                            TextSpan(text: r.borrower),
                             TextSpan(
                               text: ' (${r.notes.isNotEmpty ? r.notes : "—"})',
                               style: TextStyle(fontSize: 10, color: t.textSec),
@@ -1264,7 +1341,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      isReturned ? '✅ Returned' : '${fmt(r.principalAmount, currency)} pending',
+                      isReturned ? '✅ Returned' : '${fmt(remaining > 0 ? remaining : r.amountLent, currency)} pending',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -1338,7 +1415,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _buildPlInvestorBlock(
     ThemeTokens t,
     String currency,
-    List liveInvestors,
+    List<Investor> liveInvestors,
     double totalToInvestors,
     double ownerProfit,
   ) {
