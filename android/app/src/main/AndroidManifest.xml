@@ -1,8 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+
     <application
-        android:label="online_buiness_product_traker"
+        android:label="StockMate"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Disable Impeller on OpenGLES to avoid severe shader compilation freezes on budget chipsets -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

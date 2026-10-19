@@ -13,6 +13,7 @@ class Product {
   final String notes;
   final int lowStockThreshold;
   final String? imageUrl;
+  final String branchName; // e.g. 'Bonani', 'Gulshan', 'Nikunjo', 'Jamgora', 'Savar'
   final DateTime createdAt;
 
   Product({
@@ -28,6 +29,7 @@ class Product {
     this.notes = '',
     this.lowStockThreshold = 3,
     this.imageUrl,
+    this.branchName = 'Bonani',
     DateTime? createdAt,
   })  : sellingPrice = sellingPrice ?? (pricePerPiece * 1.25),
         totalPrice = totalPrice ?? (quantity * pricePerPiece),
@@ -42,6 +44,7 @@ class Product {
   int get stockQuantity => quantity;
   String get sku => productCode;
   String get category => brandName;
+  String get branch => branchName;
 
   // Pricing Helpers per Spec Section 7.3
   static double calculateSellingPriceWithMarkup(double cost, double markupPercentage) {
@@ -78,6 +81,7 @@ class Product {
       notes: data['notes'] ?? '',
       lowStockThreshold: data['lowStockThreshold'] ?? 3,
       imageUrl: data['imageUrl'],
+      branchName: data['branchName'] ?? data['branch'] ?? 'Bonani',
       createdAt: parseDate(data['createdAt']),
     );
   }
@@ -96,6 +100,7 @@ class Product {
       'notes': notes,
       'lowStockThreshold': lowStockThreshold,
       'imageUrl': imageUrl,
+      'branchName': branchName,
       'createdAt': createdAt.toIso8601String(),
     };
   }
@@ -113,6 +118,7 @@ class Product {
     String? notes,
     int? lowStockThreshold,
     String? imageUrl,
+    String? branchName,
     DateTime? createdAt,
   }) {
     final updatedQty = quantity ?? this.quantity;
@@ -131,6 +137,7 @@ class Product {
       notes: notes ?? this.notes,
       lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
       imageUrl: imageUrl ?? this.imageUrl,
+      branchName: branchName ?? this.branchName,
       createdAt: createdAt ?? this.createdAt,
     );
   }

@@ -42,6 +42,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   late TextEditingController notesController;
   late TextEditingController thresholdController;
 
+  late String selectedBranch;
   late DateTime selectedDate;
   double autoTotalPrice = 0.0;
   bool _isInternalPriceUpdate = false;
@@ -58,6 +59,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     perm = Get.find<PermissionService>();
 
     final p = widget.product;
+    selectedBranch = (p?.branchName.isNotEmpty == true) ? p!.branchName : 'Bonani';
     brandController = TextEditingController(text: p?.brandName ?? '');
     catalogController = TextEditingController(text: p?.catalogName ?? '');
     codeController = TextEditingController(text: p?.productCode ?? controller.generateProductCode());
@@ -214,6 +216,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         buyingDate: selectedDate,
         notes: notesController.text.trim(),
         lowStockThreshold: int.tryParse(thresholdController.text) ?? 3,
+        branchName: selectedBranch,
         createdAt: widget.product?.createdAt ?? DateTime.now(),
       );
 
@@ -309,6 +312,66 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Branch / Outlet Selector
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Assigned Branch / Outlet',
+                    style: getTextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      color: themeService.textColor,
+                    ),
+                  ),
+                  8.verticalSpace,
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 4.h),
+                    decoration: BoxDecoration(
+                      color: themeService.inputFillColor,
+                      borderRadius: BorderRadius.circular(12.r),
+                      border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: db.branches.any((b) => b.name == selectedBranch)
+                            ? selectedBranch
+                            : (db.branches.isNotEmpty ? db.branches.first.name : 'Bonani'),
+                        isExpanded: true,
+                        dropdownColor: themeService.cardColor,
+                        icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary),
+                        items: (db.branches.isNotEmpty
+                                ? db.branches.map((b) => b.name).toList()
+                                : ['Bonani', 'Gulshan', 'Nikunjo', 'Jamgora', 'Savar'])
+                            .map((name) {
+                          return DropdownMenuItem<String>(
+                            value: name,
+                            child: Row(
+                              children: [
+                                Icon(Icons.storefront_rounded, size: 16.w, color: AppColors.primary),
+                                8.horizontalSpace,
+                                Text(
+                                  name,
+                                  style: getTextStyle(
+                                    fontSize: 13.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: themeService.textColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => selectedBranch = val);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              16.verticalSpace,
+
               // Brand & Catalog
               Row(
                 children: [

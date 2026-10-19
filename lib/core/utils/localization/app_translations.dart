@@ -68,6 +68,15 @@ class AppTranslations extends Translations {
           'delete_confirm': 'Are you sure you want to delete this product?',
           'brands_count': 'Brands',
           'total_units': 'Total Units',
+          'branches_title': 'Store Branches',
+          'unit_stocks': 'Unit Stocks',
+          'branch_skus': 'Branch SKUs',
+          'branch_bonani': 'Bonani',
+          'branch_gulshan': 'Gulshan',
+          'branch_nikunjo': 'Nikunjo',
+          'branch_jamgora': 'Jamgora',
+          'branch_savar': 'Savar',
+          'transfer_stock': 'Transfer Stock',
 
           // Sales & POS
           'sales_pos': 'POS & Sales',
@@ -219,6 +228,15 @@ class AppTranslations extends Translations {
           'delete_confirm': 'আপনি কি নিশ্চিতভাবে এই পণ্যটি মুছে ফেলতে চান?',
           'brands_count': 'ব্র্যান্ড সংখ্যা',
           'total_units': 'মোট পিস',
+          'branches_title': 'স্টোর ব্রাঞ্চসমূহ',
+          'unit_stocks': 'ইউনিট স্টক',
+          'branch_skus': 'ব্রাঞ্চ এসকেইউ',
+          'branch_bonani': 'বনানী',
+          'branch_gulshan': 'গুলশান',
+          'branch_nikunjo': 'নিকুঞ্জ',
+          'branch_jamgora': 'জামগড়া',
+          'branch_savar': 'সাভার',
+          'transfer_stock': 'স্টক স্থানান্তর',
 
           // Sales & POS
           'sales_pos': 'বিক্রয় ও পিওএস',

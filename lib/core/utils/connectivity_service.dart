@@ -26,17 +26,23 @@ class ConnectivityService extends GetxService {
   }
 
   void _updateConnectionStatus(List<ConnectivityResult> result) {
-    isConnected.value = result.isNotEmpty && !result.contains(ConnectivityResult.none);
+    final connected = result.isNotEmpty && !result.contains(ConnectivityResult.none);
+    final wasConnected = isConnected.value;
+    isConnected.value = connected;
     
-    if (!isConnected.value) {
-      Get.snackbar(
-        'No Internet',
-        'Please check your internet connection',
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 3),
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
-      );
+    // Only alert if transitioning from connected to disconnected and overlay context is active
+    if (wasConnected && !connected && Get.context != null) {
+      try {
+        Get.rawSnackbar(
+          title: 'No Internet',
+          message: 'Please check your internet connection',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 3),
+          backgroundColor: Colors.redAccent,
+        );
+      } catch (e) {
+        debugPrint('Could not display offline snackbar: $e');
+      }
     }
   }
 

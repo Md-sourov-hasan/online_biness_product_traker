@@ -19,12 +19,12 @@ class PolicyModel {
 
   factory PolicyModel.fromMap(Map<String, dynamic> data) {
     return PolicyModel(
-      minimumPricePercentage: (data['minimumPricePercentage'] ?? 80.0).toDouble(),
-      exchangeFloorPercentage: (data['exchangeFloorPercentage'] ?? 80.0).toDouble(),
+      minimumPricePercentage: (data['minimumPricePercentage'] as num?)?.toDouble() ?? 80.0,
+      exchangeFloorPercentage: (data['exchangeFloorPercentage'] as num?)?.toDouble() ?? 80.0,
       refundMode: data['refundMode'] ?? 'money_refund',
-      maxDistinctSkusPerSale: (data['maxDistinctSkusPerSale'] ?? 10) as int,
-      maxTotalUnitsPerSale: (data['maxTotalUnitsPerSale'] ?? 100) as int,
-      auditRetentionMonths: (data['auditRetentionMonths'] ?? 6) as int,
+      maxDistinctSkusPerSale: (data['maxDistinctSkusPerSale'] as num?)?.toInt() ?? 10,
+      maxTotalUnitsPerSale: (data['maxTotalUnitsPerSale'] as num?)?.toInt() ?? 100,
+      auditRetentionMonths: (data['auditRetentionMonths'] as num?)?.toInt() ?? 6,
     );
   }
 

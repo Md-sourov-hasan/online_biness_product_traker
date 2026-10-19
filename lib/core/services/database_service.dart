@@ -18,6 +18,7 @@ import '../models/loan_model.dart';
 import '../models/receivable_model.dart';
 import '../models/refund_record_model.dart';
 import '../models/supplier_model.dart';
+import '../models/branch_model.dart';
 import 'notification_service.dart';
 import '../../features/notifications/models/notification_item.dart';
 import '../../features/notifications/controllers/notifications_controller.dart';
@@ -35,6 +36,9 @@ class DatabaseService extends GetxService {
   final RxList<Expense> expenses = <Expense>[].obs;
   final RxList<ActivityLog> activityLogs = <ActivityLog>[].obs;
   final RxList<AppUser> users = <AppUser>[].obs;
+
+  // Multi-Branch Store
+  final RxList<Branch> branches = <Branch>[].obs;
 
   // New RBAC & Financial Stores
   final Rx<PolicyModel> policy = PolicyModel().obs;
@@ -85,6 +89,104 @@ class DatabaseService extends GetxService {
   double get totalStockValuation => products.fold(0.0, (sum, p) => sum + (p.quantity * p.pricePerPiece));
   List<Product> get lowStockProducts => products.where((p) => p.quantity <= p.lowStockThreshold).toList();
   List<String> get allBrands => products.map((p) => p.brandName).toSet().toList();
+
+  // Multi-Branch Operations
+  List<Branch> get allBranches => branches;
+
+  int getBranchUnitStocks(String branchName) {
+    return products
+        .where((p) => p.branchName.trim().toLowerCase() == branchName.trim().toLowerCase())
+        .fold(0, (sum, p) => sum + p.quantity);
+  }
+
+  double getBranchValuation(String branchName) {
+    return products
+        .where((p) => p.branchName.trim().toLowerCase() == branchName.trim().toLowerCase())
+        .fold(0.0, (sum, p) => sum + (p.quantity * p.pricePerPiece));
+  }
+
+  int getBranchSkus(String branchName) {
+    return products
+        .where((p) => p.branchName.trim().toLowerCase() == branchName.trim().toLowerCase())
+        .length;
+  }
+
+  List<Product> getBranchProducts(String branchName) {
+    return products
+        .where((p) => p.branchName.trim().toLowerCase() == branchName.trim().toLowerCase())
+        .toList();
+  }
+
+  int getBranchLowStockCount(String branchName) {
+    return products
+        .where((p) =>
+            p.branchName.trim().toLowerCase() == branchName.trim().toLowerCase() &&
+            p.quantity <= p.lowStockThreshold)
+        .length;
+  }
+
+  void addBranch(Branch branch) {
+    branches.add(branch);
+    saveToLocal();
+  }
+
+  void updateBranch(Branch branch) {
+    final idx = branches.indexWhere((b) => b.id == branch.id);
+    if (idx != -1) {
+      branches[idx] = branch;
+      saveToLocal();
+    }
+  }
+
+  void deleteBranch(String id) {
+    branches.removeWhere((b) => b.id == id);
+    saveToLocal();
+  }
+
+  bool transferStock({
+    required String productId,
+    required String targetBranch,
+    required int transferQty,
+  }) {
+    final srcIdx = products.indexWhere((p) => p.id == productId);
+    if (srcIdx == -1) return false;
+    final src = products[srcIdx];
+    if (src.quantity < transferQty || transferQty <= 0) return false;
+
+    // Decrement from source branch
+    final remQty = src.quantity - transferQty;
+    products[srcIdx] = src.copyWith(quantity: remQty);
+
+    // Look for same product in target branch
+    final tgtIdx = products.indexWhere((p) =>
+        p.productCode.trim().toLowerCase() == src.productCode.trim().toLowerCase() &&
+        p.branchName.trim().toLowerCase() == targetBranch.trim().toLowerCase());
+
+    if (tgtIdx != -1) {
+      final tgt = products[tgtIdx];
+      products[tgtIdx] = tgt.copyWith(quantity: tgt.quantity + transferQty);
+    } else {
+      products.add(src.copyWith(
+        id: const Uuid().v4(),
+        branchName: targetBranch,
+        quantity: transferQty,
+      ));
+    }
+
+    activityLogs.insert(
+      0,
+      ActivityLog(
+        id: const Uuid().v4(),
+        type: 'transfer',
+        title: 'Stock Transferred ($transferQty units)',
+        description: '${src.displayName} moved from ${src.branchName} to $targetBranch',
+        timestamp: DateTime.now(),
+      ),
+    );
+
+    saveToLocal();
+    return true;
+  }
 
   // 9.1 Gross Sales = Sum of base selling value
   double get totalGrossSales => sales.fold(0.0, (sum, s) => sum + s.grossSales);
@@ -1454,6 +1556,7 @@ class DatabaseService extends GetxService {
 
   Future<void> _executeSave() async {
     try {
+      _prefs ??= await SharedPreferences.getInstance();
       if (_prefs == null) return;
       await _prefs!.setString('sm_products', jsonEncode(products.map((e) => e.toMap()).toList()));
       await _prefs!.setString('sm_sales', jsonEncode(sales.map((e) => e.toMap()).toList()));
@@ -1471,13 +1574,14 @@ class DatabaseService extends GetxService {
       await _prefs!.setString('sm_rec_pmts', jsonEncode(receivablePayments.map((e) => e.toMap()).toList()));
       await _prefs!.setString('sm_refunds', jsonEncode(refundRecords.map((e) => e.toMap()).toList()));
       await _prefs!.setString('sm_suppliers', jsonEncode(suppliers.map((e) => e.toMap()).toList()));
+      await _prefs!.setString('sm_branches', jsonEncode(branches.map((e) => e.toMap()).toList()));
     } catch (e) {
       debugPrint('Error saving database to local storage: $e');
     }
   }
 
   Future<void> loadFromLocal() async {
-    if (_prefs == null) return;
+    _prefs ??= await SharedPreferences.getInstance();
 
     final productsStr = _prefs!.getString('sm_products');
     final salesStr = _prefs!.getString('sm_sales');
@@ -1495,6 +1599,17 @@ class DatabaseService extends GetxService {
     final recPmtsStr = _prefs!.getString('sm_rec_pmts');
     final refundsStr = _prefs!.getString('sm_refunds');
     final suppliersStr = _prefs!.getString('sm_suppliers');
+    final branchesStr = _prefs!.getString('sm_branches');
+
+    if (branchesStr != null && branchesStr.isNotEmpty) {
+      final List<dynamic> list = jsonDecode(branchesStr);
+      branches.assignAll(list.map((m) => Branch.fromMap(m as Map<String, dynamic>, m['id'] ?? '')).toList());
+    } else {
+      _seedDefaultBranches();
+    }
+    if (branches.isEmpty) {
+      _seedDefaultBranches();
+    }
 
     if (productsStr != null && productsStr.isNotEmpty) {
       final List<dynamic> list = jsonDecode(productsStr);
@@ -1503,6 +1618,9 @@ class DatabaseService extends GetxService {
       _seedDefaultData();
       return;
     }
+
+    // Ensure all 5 branches have stock
+    _ensureBranchStockDistribution();
 
     if (salesStr != null && salesStr.isNotEmpty) {
       final List<dynamic> list = jsonDecode(salesStr);
@@ -1581,69 +1699,355 @@ class DatabaseService extends GetxService {
     }
   }
 
-  void _seedDefaultData() {
-    products.assignAll([
-      Product(
-        id: '1',
-        brandName: 'Samsung',
-        catalogName: 'Galaxy Buds Pro',
-        productCode: 'SM-8091',
-        quantity: 24,
-        pricePerPiece: 8500,
-        sellingPrice: 11500,
-        buyingDate: DateTime.now().subtract(const Duration(days: 12)),
-        notes: 'Original distributor stock',
-        lowStockThreshold: 5,
+  void _seedDefaultBranches() {
+    branches.assignAll([
+      Branch(
+        id: 'branch_bonani',
+        name: 'Bonani',
+        banglaName: 'বনানী',
+        address: 'Road 11, Block D, Banani Commercial Area, Dhaka',
+        managerName: 'Tanvir Ahmed',
+        managerPhone: '+880 1711-234501',
+        email: 'bonani@stockmate.com',
+        colorValue: 0xFF2563EB, // Royal Blue
       ),
-      Product(
-        id: '2',
-        brandName: 'Apple',
-        catalogName: 'AirPods Max',
-        productCode: 'AP-4402',
-        quantity: 8,
-        pricePerPiece: 45000,
-        sellingPrice: 58000,
-        buyingDate: DateTime.now().subtract(const Duration(days: 8)),
-        notes: 'Space Gray and Silver',
-        lowStockThreshold: 3,
+      Branch(
+        id: 'branch_gulshan',
+        name: 'Gulshan',
+        banglaName: 'গুলশান',
+        address: 'Road 36, Gulshan 2, Dhaka 1212',
+        managerName: 'Kazi Farhan',
+        managerPhone: '+880 1711-234502',
+        email: 'gulshan@stockmate.com',
+        colorValue: 0xFF10B981, // Emerald Green
       ),
-      Product(
-        id: '3',
-        brandName: 'Walton',
-        catalogName: 'Primo S8 Power Bank 20000mAh',
-        productCode: 'WL-1029',
-        quantity: 3,
-        pricePerPiece: 1400,
-        sellingPrice: 1950,
-        buyingDate: DateTime.now().subtract(const Duration(days: 20)),
-        notes: 'Fast charging model',
-        lowStockThreshold: 5,
+      Branch(
+        id: 'branch_nikunjo',
+        name: 'Nikunjo',
+        banglaName: 'নিকুঞ্জ',
+        address: 'Road 4, Sector 2, Nikunja, Khilkhet, Dhaka',
+        managerName: 'Rashedul Islam',
+        managerPhone: '+880 1711-234503',
+        email: 'nikunjo@stockmate.com',
+        colorValue: 0xFF8B5CF6, // Violet / Purple
       ),
-      Product(
-        id: '4',
-        brandName: 'Xiaomi',
-        catalogName: 'Redmi Smart Band 2',
-        productCode: 'XM-9011',
-        quantity: 35,
-        pricePerPiece: 2200,
-        sellingPrice: 2900,
-        buyingDate: DateTime.now().subtract(const Duration(days: 5)),
-        notes: 'Black & Blue straps',
-        lowStockThreshold: 6,
+      Branch(
+        id: 'branch_jamgora',
+        name: 'Jamgora',
+        banglaName: 'জামগড়া',
+        address: 'Jamgora Central Market, Ashulia, Savar',
+        managerName: 'Mahmudul Hasan',
+        managerPhone: '+880 1711-234504',
+        email: 'jamgora@stockmate.com',
+        colorValue: 0xFFF59E0B, // Amber / Orange
       ),
-      Product(
-        id: '5',
-        brandName: 'Apex',
-        catalogName: 'Venturini Leather Wallet',
-        productCode: 'APX-771',
-        quantity: 18,
-        pricePerPiece: 1100,
-        sellingPrice: 1750,
-        buyingDate: DateTime.now().subtract(const Duration(days: 15)),
-        notes: 'Brown genuine leather',
-        lowStockThreshold: 4,
+      Branch(
+        id: 'branch_savar',
+        name: 'Savar',
+        banglaName: 'সাভার',
+        address: 'Bazar Bus Stand Main Road, Savar',
+        managerName: 'Arifur Rahman',
+        managerPhone: '+880 1711-234505',
+        email: 'savar@stockmate.com',
+        colorValue: 0xFF0F766E, // Deep Teal
       ),
     ]);
+  }
+
+  void _ensureBranchStockDistribution() {
+    final branchNames = ['Bonani', 'Gulshan', 'Nikunjo', 'Jamgora', 'Savar'];
+    final defaultBranchProducts = {
+      'Bonani': [
+        Product(
+          id: 'bnn_1',
+          brandName: 'Samsung',
+          catalogName: 'Galaxy Buds Pro',
+          productCode: 'SM-8091',
+          quantity: 24,
+          pricePerPiece: 8500,
+          sellingPrice: 11500,
+          buyingDate: DateTime.now().subtract(const Duration(days: 12)),
+          notes: 'Original distributor stock',
+          lowStockThreshold: 5,
+          branchName: 'Bonani',
+        ),
+        Product(
+          id: 'bnn_2',
+          brandName: 'Apple',
+          catalogName: 'Apple Watch Ultra 2',
+          productCode: 'AP-8820',
+          quantity: 12,
+          pricePerPiece: 68000,
+          sellingPrice: 82000,
+          buyingDate: DateTime.now().subtract(const Duration(days: 6)),
+          notes: 'Titanium Case with Trail Loop',
+          lowStockThreshold: 3,
+          branchName: 'Bonani',
+        ),
+        Product(
+          id: 'bnn_3',
+          brandName: 'Anker',
+          catalogName: 'PowerCore 20000mAh PowerBank',
+          productCode: 'ANK-4401',
+          quantity: 30,
+          pricePerPiece: 2800,
+          sellingPrice: 3900,
+          buyingDate: DateTime.now().subtract(const Duration(days: 10)),
+          notes: 'High speed power IQ delivery',
+          lowStockThreshold: 6,
+          branchName: 'Bonani',
+        ),
+        Product(
+          id: 'bnn_4',
+          brandName: 'Sony',
+          catalogName: 'WH-1000XM5 Wireless Headset',
+          productCode: 'SN-9022',
+          quantity: 8,
+          pricePerPiece: 34000,
+          sellingPrice: 42000,
+          buyingDate: DateTime.now().subtract(const Duration(days: 4)),
+          notes: 'Industry-leading noise canceling',
+          lowStockThreshold: 2,
+          branchName: 'Bonani',
+        ),
+      ],
+      'Gulshan': [
+        Product(
+          id: 'gls_1',
+          brandName: 'Apple',
+          catalogName: 'AirPods Max Space Gray',
+          productCode: 'AP-4402',
+          quantity: 8,
+          pricePerPiece: 45000,
+          sellingPrice: 58000,
+          buyingDate: DateTime.now().subtract(const Duration(days: 8)),
+          notes: 'Space Gray with Smart Case',
+          lowStockThreshold: 3,
+          branchName: 'Gulshan',
+        ),
+        Product(
+          id: 'gls_2',
+          brandName: 'Apple',
+          catalogName: 'iPhone 15 Pro Silicone Case',
+          productCode: 'AP-1509',
+          quantity: 45,
+          pricePerPiece: 1200,
+          sellingPrice: 2200,
+          buyingDate: DateTime.now().subtract(const Duration(days: 14)),
+          notes: 'Midnight Black & Storm Blue',
+          lowStockThreshold: 10,
+          branchName: 'Gulshan',
+        ),
+        Product(
+          id: 'gls_3',
+          brandName: 'Bose',
+          catalogName: 'QuietComfort 45 Headphones',
+          productCode: 'BO-5521',
+          quantity: 10,
+          pricePerPiece: 28000,
+          sellingPrice: 36000,
+          buyingDate: DateTime.now().subtract(const Duration(days: 9)),
+          notes: 'White Smoke edition',
+          lowStockThreshold: 4,
+          branchName: 'Gulshan',
+        ),
+        Product(
+          id: 'gls_4',
+          brandName: 'Belkin',
+          catalogName: '3-in-1 Wireless MagSafe Charger',
+          productCode: 'BL-3390',
+          quantity: 16,
+          pricePerPiece: 8500,
+          sellingPrice: 12500,
+          buyingDate: DateTime.now().subtract(const Duration(days: 7)),
+          notes: 'Fast charge for Apple devices',
+          lowStockThreshold: 4,
+          branchName: 'Gulshan',
+        ),
+      ],
+      'Nikunjo': [
+        Product(
+          id: 'nkj_1',
+          brandName: 'Walton',
+          catalogName: 'Primo S8 Power Bank 20000mAh',
+          productCode: 'WL-1029',
+          quantity: 15,
+          pricePerPiece: 1400,
+          sellingPrice: 1950,
+          buyingDate: DateTime.now().subtract(const Duration(days: 20)),
+          notes: 'Fast charging dual-port model',
+          lowStockThreshold: 5,
+          branchName: 'Nikunjo',
+        ),
+        Product(
+          id: 'nkj_2',
+          brandName: 'Baseus',
+          catalogName: '65W GaN Fast Charger',
+          productCode: 'BS-6501',
+          quantity: 28,
+          pricePerPiece: 2100,
+          sellingPrice: 3100,
+          buyingDate: DateTime.now().subtract(const Duration(days: 11)),
+          notes: 'Type-C dual output QC 4.0',
+          lowStockThreshold: 8,
+          branchName: 'Nikunjo',
+        ),
+        Product(
+          id: 'nkj_3',
+          brandName: 'JBL',
+          catalogName: 'Flip 6 Bluetooth Speaker',
+          productCode: 'JBL-6012',
+          quantity: 12,
+          pricePerPiece: 9500,
+          sellingPrice: 13500,
+          buyingDate: DateTime.now().subtract(const Duration(days: 5)),
+          notes: 'IP67 Waterproof portable speaker',
+          lowStockThreshold: 3,
+          branchName: 'Nikunjo',
+        ),
+        Product(
+          id: 'nkj_4',
+          brandName: 'Remax',
+          catalogName: 'Fast Type-C Braided Cable 2M',
+          productCode: 'RMX-1102',
+          quantity: 55,
+          pricePerPiece: 350,
+          sellingPrice: 750,
+          buyingDate: DateTime.now().subtract(const Duration(days: 16)),
+          notes: 'Heavy duty zinc alloy connectors',
+          lowStockThreshold: 15,
+          branchName: 'Nikunjo',
+        ),
+      ],
+      'Jamgora': [
+        Product(
+          id: 'jmg_1',
+          brandName: 'Xiaomi',
+          catalogName: 'Redmi Smart Band 2',
+          productCode: 'XM-9011',
+          quantity: 35,
+          pricePerPiece: 2200,
+          sellingPrice: 2900,
+          buyingDate: DateTime.now().subtract(const Duration(days: 5)),
+          notes: 'Black & Blue straps included',
+          lowStockThreshold: 6,
+          branchName: 'Jamgora',
+        ),
+        Product(
+          id: 'jmg_2',
+          brandName: 'Realme',
+          catalogName: 'Buds Air 5 Pro ANC Earbuds',
+          productCode: 'RM-5011',
+          quantity: 20,
+          pricePerPiece: 4800,
+          sellingPrice: 6500,
+          buyingDate: DateTime.now().subtract(const Duration(days: 8)),
+          notes: '50dB active noise cancellation',
+          lowStockThreshold: 5,
+          branchName: 'Jamgora',
+        ),
+        Product(
+          id: 'jmg_3',
+          brandName: 'Fastrack',
+          catalogName: 'Reflex Play Smartwatch',
+          productCode: 'FT-7720',
+          quantity: 18,
+          pricePerPiece: 3600,
+          sellingPrice: 5200,
+          buyingDate: DateTime.now().subtract(const Duration(days: 12)),
+          notes: 'AMOLED display with BT calling',
+          lowStockThreshold: 4,
+          branchName: 'Jamgora',
+        ),
+        Product(
+          id: 'jmg_4',
+          brandName: 'Ugreen',
+          catalogName: '6-in-1 USB-C Hub 4K HDMI',
+          productCode: 'UG-6091',
+          quantity: 24,
+          pricePerPiece: 1600,
+          sellingPrice: 2400,
+          buyingDate: DateTime.now().subtract(const Duration(days: 6)),
+          notes: 'Aluminum shell multi-adapter',
+          lowStockThreshold: 5,
+          branchName: 'Jamgora',
+        ),
+      ],
+      'Savar': [
+        Product(
+          id: 'svr_1',
+          brandName: 'Apex',
+          catalogName: 'Venturini Leather Wallet',
+          productCode: 'APX-771',
+          quantity: 18,
+          pricePerPiece: 1100,
+          sellingPrice: 1750,
+          buyingDate: DateTime.now().subtract(const Duration(days: 15)),
+          notes: 'Brown genuine leather bifold',
+          lowStockThreshold: 4,
+          branchName: 'Savar',
+        ),
+        Product(
+          id: 'svr_2',
+          brandName: 'Casio',
+          catalogName: 'Vintage Digital Watch A168W',
+          productCode: 'CS-1581',
+          quantity: 22,
+          pricePerPiece: 2600,
+          sellingPrice: 3800,
+          buyingDate: DateTime.now().subtract(const Duration(days: 10)),
+          notes: 'Stainless steel retro illuminator',
+          lowStockThreshold: 5,
+          branchName: 'Savar',
+        ),
+        Product(
+          id: 'svr_3',
+          brandName: 'Logitech',
+          catalogName: 'M220 Silent Wireless Mouse',
+          productCode: 'LG-2201',
+          quantity: 38,
+          pricePerPiece: 950,
+          sellingPrice: 1500,
+          buyingDate: DateTime.now().subtract(const Duration(days: 18)),
+          notes: '90% noise reduction 2.4GHz',
+          lowStockThreshold: 8,
+          branchName: 'Savar',
+        ),
+        Product(
+          id: 'svr_4',
+          brandName: 'Kingston',
+          catalogName: '64GB DataTraveler USB 3.2',
+          productCode: 'KS-6402',
+          quantity: 50,
+          pricePerPiece: 580,
+          sellingPrice: 950,
+          buyingDate: DateTime.now().subtract(const Duration(days: 7)),
+          notes: 'High speed portable flash drive',
+          lowStockThreshold: 12,
+          branchName: 'Savar',
+        ),
+      ],
+    };
+
+    bool hasChanged = false;
+    for (final bName in branchNames) {
+      final exists = products.any((p) => p.branchName.trim().toLowerCase() == bName.toLowerCase());
+      if (!exists && defaultBranchProducts.containsKey(bName)) {
+        products.addAll(defaultBranchProducts[bName]!);
+        hasChanged = true;
+      }
+    }
+
+    if (hasChanged) {
+      saveToLocal();
+    }
+  }
+
+  void _seedDefaultData() {
+    _seedDefaultBranches();
+    products.clear();
+    _ensureBranchStockDistribution();
+
 
     sales.assignAll([
       Sale(

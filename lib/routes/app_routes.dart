@@ -20,7 +20,10 @@ import '../features/reports/screens/reports_screen.dart';
 import '../features/purchases_expenses/screens/purchases_expenses_screen.dart';
 import '../features/notifications/screens/notifications_screen.dart';
 import '../features/notifications/screens/notification_settings_screen.dart';
+import '../features/branches/screens/branches_screen.dart';
+import '../features/branches/screens/branch_inventory_screen.dart';
 import '../core/models/product_model.dart';
+import '../core/models/branch_model.dart';
 
 class AppRoute {
   // ---------------------------------------------------------------------------
@@ -40,6 +43,8 @@ class AppRoute {
   static const String purchasesExpensesScreen = "/purchases-expenses";
   static const String notificationsScreen = "/notifications";
   static const String notificationSettingsScreen = "/notification-settings";
+  static const String branchesScreen = "/branches";
+  static const String branchInventoryScreen = "/branch-inventory";
 
   // Owner & Governance Routes
   static const String investorManagementScreen = "/investors";
@@ -214,6 +219,25 @@ class AppRoute {
           state: state,
           child: const NotificationSettingsScreen(),
         ),
+      ),
+      GoRoute(
+        path: branchesScreen,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const BranchesScreen(),
+        ),
+      ),
+      GoRoute(
+        path: branchInventoryScreen,
+        pageBuilder: (context, state) {
+          final branch = state.extra as Branch;
+          return _buildPageWithTransition(
+            context: context,
+            state: state,
+            child: BranchInventoryScreen(branch: branch),
+          );
+        },
       ),
     ],
   );
