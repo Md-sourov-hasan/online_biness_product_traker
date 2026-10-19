@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../core/services/theme_language_service.dart';
 import '../../../core/utils/sizer.dart';
@@ -167,11 +168,13 @@ class _BouncingNavItemState extends State<_BouncingNavItem>
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => _scaleController.forward(),
-      onTapUp: (_) {
+      onTapUp: (_) => _scaleController.reverse(),
+      onTapCancel: () => _scaleController.reverse(),
+      onTap: () {
         _scaleController.reverse();
+        HapticFeedback.selectionClick();
         widget.onTap();
       },
-      onTapCancel: () => _scaleController.reverse(),
       child: ScaleTransition(
         scale: _scaleAnimation,
         child: Container(

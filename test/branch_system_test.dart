@@ -1,7 +1,12 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:online_buiness_product_traker/core/models/branch_model.dart';
 import 'package:online_buiness_product_traker/core/models/product_model.dart';
 import 'package:online_buiness_product_traker/core/services/database_service.dart';
+import 'package:online_buiness_product_traker/core/services/theme_language_service.dart';
+import 'package:online_buiness_product_traker/core/utils/sizer.dart';
+import 'package:online_buiness_product_traker/features/branches/screens/branch_management_screen.dart';
+import 'package:online_buiness_product_traker/routes/app_routes.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:get/get.dart';
 
@@ -128,6 +133,37 @@ void main() {
       expect(db.activityLogs.first.type, equals('transfer'));
       expect(db.activityLogs.first.description, contains('Bonani'));
       expect(db.activityLogs.first.description, contains('Gulshan'));
+    });
+  });
+
+  group('Branch Management Screen Tests', () {
+    testWidgets('BranchManagementScreen renders Coming Soon banner and planned features', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      if (!Get.isRegistered<ThemeLanguageService>()) {
+        Get.put(ThemeLanguageService());
+      }
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              Sizer.init(context);
+              return const BranchManagementScreen();
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Branch Management'), findsOneWidget);
+      expect(find.text('COMING SOON'), findsOneWidget);
+      expect(find.text('Branch Management Module'), findsOneWidget);
+      expect(find.text('Planned Features in Next Release'), findsOneWidget);
+      expect(find.text('Back to More Options'), findsOneWidget);
+    });
+
+    test('AppRoute defines branchManagementScreen route constant', () {
+      expect(AppRoute.branchManagementScreen, equals('/branch-management'));
     });
   });
 }

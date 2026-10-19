@@ -16,7 +16,6 @@ import '../../../routes/app_routes.dart';
 import '../../notifications/controllers/notifications_controller.dart';
 import '../../../core/models/product_model.dart';
 import '../../../core/models/activity_log_model.dart';
-import '../../../core/models/branch_model.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -574,10 +573,6 @@ class DashboardScreen extends StatelessWidget {
         _buildProductQuantityCard(context, db, themeService, nav),
         16.verticalSpace,
 
-        // 1.1 Multi-Branch Network Hub (Super Admin Exclusive)
-        _buildMultiBranchHub(context, db, themeService),
-        16.verticalSpace,
-
         // 2. 5-Second Rotating Sales & Profit Cards (Side by Side)
         Row(
           children: [
@@ -870,7 +865,6 @@ class DashboardScreen extends StatelessWidget {
       final totalValuation = db.totalStockValuation;
       final catalogCount = db.products.length;
       final brandCount = db.allBrands.length;
-      final auth = AuthService.to;
 
       return Container(
         width: double.infinity,
@@ -928,13 +922,7 @@ class DashboardScreen extends StatelessWidget {
                   ),
                 ),
                 GestureDetector(
-                  onTap: () {
-                    if (auth.isSuperAdmin) {
-                      context.push(AppRoute.branchesScreen);
-                    } else {
-                      nav.changeTab(1);
-                    }
-                  },
+                  onTap: () => nav.changeTab(1),
                   child: Container(
                     padding: EdgeInsets.symmetric(
                       horizontal: 8.w,
@@ -948,7 +936,7 @@ class DashboardScreen extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          auth.isSuperAdmin ? 'View Branches' : 'View All',
+                          'View All',
                           style: getTextStyle(
                             fontSize: 11.sp,
                             fontWeight: FontWeight.w600,
@@ -1003,29 +991,6 @@ class DashboardScreen extends StatelessWidget {
                     color: AppColors.yellow,
                   ),
                 ),
-                if (auth.isSuperAdmin)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 2.h),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.storefront_rounded, size: 11.w, color: Colors.white),
-                        4.horizontalSpace,
-                        Text(
-                          '${db.branches.length} Branches',
-                          style: getTextStyle(
-                            fontSize: 10.sp,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
               ],
             ),
             12.verticalSpace,
@@ -1056,245 +1021,6 @@ class DashboardScreen extends StatelessWidget {
     });
   }
 
-  // --- Multi-Branch Network Hub (Super Admin Exclusive) ---
-  static Widget _buildMultiBranchHub(
-    BuildContext context,
-    DatabaseService db,
-    ThemeLanguageService themeService,
-  ) {
-    final currencyFormatter = NumberFormat('#,##,###');
-
-    return Obx(() {
-      final branches = db.branches;
-      if (branches.isEmpty) return const SizedBox.shrink();
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(5.w),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                    child: Icon(
-                      Icons.storefront_rounded,
-                      size: 16.w,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  8.horizontalSpace,
-                  Text(
-                    'Store Branches (${branches.length} Outlets)',
-                    style: getTextStyle(
-                      fontSize: 15.sp,
-                      fontWeight: FontWeight.w700,
-                      color: themeService.textColor,
-                    ),
-                  ),
-                ],
-              ),
-              GestureDetector(
-                onTap: () => context.push(AppRoute.branchesScreen),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'View All',
-                      style: getTextStyle(
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    4.horizontalSpace,
-                    Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 10.w,
-                      color: AppColors.primary,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          12.verticalSpace,
-          SizedBox(
-            height: 148.h,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: branches.length,
-              separatorBuilder: (context, index) => 12.horizontalSpace,
-              itemBuilder: (context, index) {
-                final Branch branch = branches[index];
-                final unitStocks = db.getBranchUnitStocks(branch.name);
-                final valuation = db.getBranchValuation(branch.name);
-                final skus = db.getBranchSkus(branch.name);
-
-                return GestureDetector(
-                  onTap: () {
-                    context.push(
-                      AppRoute.branchInventoryScreen,
-                      extra: branch,
-                    );
-                  },
-                  child: Container(
-                    width: 210.w,
-                    padding: EdgeInsets.all(12.w),
-                    decoration: BoxDecoration(
-                      color: themeService.cardColor,
-                      borderRadius: BorderRadius.circular(16.r),
-                      border: Border.all(
-                        color: branch.color.withValues(alpha: 0.25),
-                        width: 1.2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: branch.color.withValues(alpha: 0.06),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 28.w,
-                                  height: 28.w,
-                                  decoration: BoxDecoration(
-                                    color: branch.color.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(8.r),
-                                  ),
-                                  child: Center(
-                                    child: Icon(
-                                      Icons.store_rounded,
-                                      size: 16.w,
-                                      color: branch.color,
-                                    ),
-                                  ),
-                                ),
-                                8.horizontalSpace,
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      branch.name,
-                                      style: getTextStyle(
-                                        fontSize: 13.5.sp,
-                                        fontWeight: FontWeight.w700,
-                                        color: themeService.textColor,
-                                      ),
-                                    ),
-                                    if (branch.banglaName.isNotEmpty)
-                                      Text(
-                                        branch.banglaName,
-                                        style: getTextStyle(
-                                          fontSize: 9.5.sp,
-                                          color: branch.color,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            Icon(
-                              Icons.arrow_forward_rounded,
-                              size: 14.w,
-                              color: branch.color,
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
-                          decoration: BoxDecoration(
-                            color: themeService.inputFillColor,
-                            borderRadius: BorderRadius.circular(8.r),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Unit Stocks',
-                                    style: getTextStyle(fontSize: 9.sp, color: themeService.subtextColor),
-                                  ),
-                                  Text(
-                                    '$unitStocks',
-                                    style: getTextStyle(
-                                      fontSize: 12.5.sp,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    'Branch SKUs',
-                                    style: getTextStyle(fontSize: 9.sp, color: themeService.subtextColor),
-                                  ),
-                                  Text(
-                                    '$skus',
-                                    style: getTextStyle(
-                                      fontSize: 12.5.sp,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.purple,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Valuation:',
-                              style: getTextStyle(
-                                fontSize: 10.5.sp,
-                                color: themeService.subtextColor,
-                              ),
-                            ),
-                            Text(
-                              '৳${currencyFormatter.format(valuation.toInt())}',
-                              style: getTextStyle(
-                                fontSize: 12.5.sp,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.secondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      );
-    });
-  }
 
 
   // --- Rotating Metric Card ---

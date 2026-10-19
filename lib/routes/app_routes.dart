@@ -22,6 +22,7 @@ import '../features/notifications/screens/notifications_screen.dart';
 import '../features/notifications/screens/notification_settings_screen.dart';
 import '../features/branches/screens/branches_screen.dart';
 import '../features/branches/screens/branch_inventory_screen.dart';
+import '../features/branches/screens/branch_management_screen.dart';
 import '../core/models/product_model.dart';
 import '../core/models/branch_model.dart';
 
@@ -45,6 +46,7 @@ class AppRoute {
   static const String notificationSettingsScreen = "/notification-settings";
   static const String branchesScreen = "/branches";
   static const String branchInventoryScreen = "/branch-inventory";
+  static const String branchManagementScreen = "/branch-management";
 
   // Owner & Governance Routes
   static const String investorManagementScreen = "/investors";
@@ -238,6 +240,14 @@ class AppRoute {
             child: BranchInventoryScreen(branch: branch),
           );
         },
+      ),
+      GoRoute(
+        path: branchManagementScreen,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          context: context,
+          state: state,
+          child: const BranchManagementScreen(),
+        ),
       ),
     ],
   );

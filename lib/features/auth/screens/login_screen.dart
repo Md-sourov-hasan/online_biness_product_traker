@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/services/auth_service.dart';
@@ -26,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _selectedRole = AppConstants.roleOwner;
   bool _showCustomInput = false;
+  bool _isLoading = false;
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
@@ -59,18 +61,28 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _proceedToDashboard() async {
-    await auth.loginAsRole(
-      _selectedRole,
-      customName: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
-      customEmail: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
-    );
+    if (_isLoading) return;
+    HapticFeedback.mediumImpact();
+    setState(() => _isLoading = true);
 
-    if (Get.isRegistered<BottomNavigationController>()) {
-      Get.find<BottomNavigationController>().changeTab(0);
-    }
+    try {
+      await auth.loginAsRole(
+        _selectedRole,
+        customName: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
+        customEmail: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
+      );
 
-    if (mounted) {
-      context.go(AppRoute.bottomNavigationScreen);
+      if (Get.isRegistered<BottomNavigationController>()) {
+        Get.find<BottomNavigationController>().changeTab(0);
+      }
+
+      if (mounted) {
+        context.go(AppRoute.bottomNavigationScreen);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -149,6 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       return GestureDetector(
                         onTap: () {
+                          HapticFeedback.selectionClick();
                           theme.setTheme(mode);
                         },
                         child: AnimatedContainer(
@@ -309,7 +322,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           // Quick Dark/Light Toggle
                           GestureDetector(
-                            onTap: () => theme.toggleDarkMode(),
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              theme.toggleDarkMode();
+                            },
                             child: Container(
                               padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
                               decoration: BoxDecoration(
@@ -347,7 +363,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           8.horizontalSpace,
                           // Theme Palette Picker Button
                           GestureDetector(
-                            onTap: () => _showThemeModal(context),
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              _showThemeModal(context);
+                            },
                             child: Container(
                               padding: EdgeInsets.all(7.w),
                               decoration: BoxDecoration(
@@ -414,63 +433,72 @@ class _LoginScreenState extends State<LoginScreen> {
                   20.verticalSpace,
 
                   // 2. Interactive 3-Role Selection Cards
-                  _buildRoleCard(
-                    t: t,
-                    role: AppConstants.roleOwner,
-                    title: 'Owner / Super Admin',
-                    badge: 'Full Financial & Governance',
-                    description: 'Section 9 P&L, Investor Cap Tables, Borrowed Loans, Price Floor Controls & Audit Trail',
-                    icon: Icons.shield_rounded,
-                    accentColor: AppColors.warning,
-                    isSelected: _selectedRole == AppConstants.roleOwner,
-                    onTap: () {
-                      setState(() {
-                        _selectedRole = AppConstants.roleOwner;
-                        _updateRoleDefaults(_selectedRole);
-                      });
-                    },
-                  ),
-                  12.verticalSpace,
+                  RepaintBoundary(
+                    child: Column(
+                      children: [
+                        _RoleSelectionCard(
+                          t: t,
+                          role: AppConstants.roleOwner,
+                          title: 'Owner / Super Admin',
+                          badge: 'Full Financial & Governance',
+                          description: 'Section 9 P&L, Investor Cap Tables, Borrowed Loans, Price Floor Controls & Audit Trail',
+                          icon: Icons.shield_rounded,
+                          accentColor: AppColors.warning,
+                          isSelected: _selectedRole == AppConstants.roleOwner,
+                          onTap: () {
+                            setState(() {
+                              _selectedRole = AppConstants.roleOwner;
+                              _updateRoleDefaults(_selectedRole);
+                            });
+                          },
+                        ),
+                        12.verticalSpace,
 
-                  _buildRoleCard(
-                    t: t,
-                    role: AppConstants.roleManager,
-                    title: 'Store Manager',
-                    badge: 'Operational & Restock Control',
-                    description: 'Inventory Management, Discount Requests, Restock Orders & Operational Sales Analytics',
-                    icon: Icons.manage_accounts_rounded,
-                    accentColor: AppColors.purple,
-                    isSelected: _selectedRole == AppConstants.roleManager,
-                    onTap: () {
-                      setState(() {
-                        _selectedRole = AppConstants.roleManager;
-                        _updateRoleDefaults(_selectedRole);
-                      });
-                    },
-                  ),
-                  12.verticalSpace,
+                        _RoleSelectionCard(
+                          t: t,
+                          role: AppConstants.roleManager,
+                          title: 'Store Manager',
+                          badge: 'Operational & Restock Control',
+                          description: 'Inventory Management, Discount Requests, Restock Orders & Operational Sales Analytics',
+                          icon: Icons.manage_accounts_rounded,
+                          accentColor: AppColors.purple,
+                          isSelected: _selectedRole == AppConstants.roleManager,
+                          onTap: () {
+                            setState(() {
+                              _selectedRole = AppConstants.roleManager;
+                              _updateRoleDefaults(_selectedRole);
+                            });
+                          },
+                        ),
+                        12.verticalSpace,
 
-                  _buildRoleCard(
-                    t: t,
-                    role: AppConstants.roleStaff,
-                    title: 'Sales Associate / Staff',
-                    badge: 'Privacy-First Terminal',
-                    description: 'Fast POS Checkout, Product Selling Prices, Availability Checks & Personal Expense Submissions',
-                    icon: Icons.point_of_sale_rounded,
-                    accentColor: t.accent,
-                    isSelected: _selectedRole == AppConstants.roleStaff,
-                    onTap: () {
-                      setState(() {
-                        _selectedRole = AppConstants.roleStaff;
-                        _updateRoleDefaults(_selectedRole);
-                      });
-                    },
+                        _RoleSelectionCard(
+                          t: t,
+                          role: AppConstants.roleStaff,
+                          title: 'Sales Associate / Staff',
+                          badge: 'Privacy-First Terminal',
+                          description: 'Fast POS Checkout, Product Selling Prices, Availability Checks & Personal Expense Submissions',
+                          icon: Icons.point_of_sale_rounded,
+                          accentColor: t.accent,
+                          isSelected: _selectedRole == AppConstants.roleStaff,
+                          onTap: () {
+                            setState(() {
+                              _selectedRole = AppConstants.roleStaff;
+                              _updateRoleDefaults(_selectedRole);
+                            });
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                   18.verticalSpace,
 
                   // Optional Toggle for Custom Name/Email
                   GestureDetector(
-                    onTap: () => setState(() => _showCustomInput = !_showCustomInput),
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _showCustomInput = !_showCustomInput);
+                    },
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -543,6 +571,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   CustomFilledButton(
                     text: 'Enter Dashboard as ${_getRoleDisplayShort(_selectedRole)}',
                     color: t.accent,
+                    isLoading: _isLoading,
                     onPressed: _proceedToDashboard,
                   ),
                   14.verticalSpace,
@@ -573,114 +602,186 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  Widget _buildRoleCard({
-    required ThemeTokens t,
-    required String role,
-    required String title,
-    required String badge,
-    required String description,
-    required IconData icon,
-    required Color accentColor,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: EdgeInsets.all(16.w),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? accentColor.withValues(alpha: 0.12)
-              : t.card,
-          borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(
-            color: isSelected ? accentColor : t.border,
-            width: isSelected ? 2 : 1,
-          ),
-          boxShadow: [
-            if (isSelected)
-              BoxShadow(
-                color: accentColor.withValues(alpha: 0.22),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              )
-            else
-              BoxShadow(
-                color: t.shadow,
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: EdgeInsets.all(10.w),
-              decoration: BoxDecoration(
-                color: accentColor.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(12.r),
-              ),
-              child: Icon(icon, color: accentColor, size: 24.w),
-            ),
-            14.horizontalSpace,
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        title,
-                        style: getTextStyle(
-                          fontSize: 15.sp,
-                          fontWeight: FontWeight.w700,
-                          color: t.text,
-                        ),
-                      ),
-                      if (isSelected)
-                        Icon(Icons.check_circle_rounded, color: accentColor, size: 20.w),
-                    ],
-                  ),
-                  4.verticalSpace,
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.5.h),
-                    decoration: BoxDecoration(
-                      color: accentColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6.r),
-                    ),
-                    child: Text(
-                      badge,
-                      style: TextStyle(
-                        fontSize: 9.sp,
-                        fontWeight: FontWeight.w700,
-                        color: accentColor,
-                      ),
-                    ),
-                  ),
-                  6.verticalSpace,
-                  Text(
-                    description,
-                    style: getTextStyle(
-                      fontSize: 11.sp,
-                      fontWeight: FontWeight.w400,
-                      color: t.textSec,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   String _getRoleDisplayShort(String role) {
     if (role == AppConstants.roleOwner) return 'Owner';
     if (role == AppConstants.roleManager) return 'Manager';
     return 'Staff';
+  }
+}
+
+class _RoleSelectionCard extends StatefulWidget {
+  final ThemeTokens t;
+  final String role;
+  final String title;
+  final String badge;
+  final String description;
+  final IconData icon;
+  final Color accentColor;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _RoleSelectionCard({
+    required this.t,
+    required this.role,
+    required this.title,
+    required this.badge,
+    required this.description,
+    required this.icon,
+    required this.accentColor,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  State<_RoleSelectionCard> createState() => _RoleSelectionCardState();
+}
+
+class _RoleSelectionCardState extends State<_RoleSelectionCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pressController;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 90),
+      reverseDuration: const Duration(milliseconds: 140),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.978).animate(
+      CurvedAnimation(parent: _pressController, curve: Curves.easeOutCubic),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pressController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.t;
+    final isSelected = widget.isSelected;
+    final accentColor = widget.accentColor;
+
+    return RepaintBoundary(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => _pressController.forward(),
+        onTapUp: (_) => _pressController.reverse(),
+        onTapCancel: () => _pressController.reverse(),
+        onTap: () {
+          _pressController.reverse();
+          HapticFeedback.selectionClick();
+          widget.onTap();
+        },
+        child: ScaleTransition(
+          scale: _scaleAnimation,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            padding: EdgeInsets.all(16.w),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? accentColor.withValues(alpha: 0.12)
+                  : t.card,
+              borderRadius: BorderRadius.circular(16.r),
+              border: Border.all(
+                color: isSelected ? accentColor : t.border,
+                width: isSelected ? 2 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isSelected
+                      ? accentColor.withValues(alpha: 0.18)
+                      : t.shadow,
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  padding: EdgeInsets.all(10.w),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: isSelected ? 0.22 : 0.12),
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
+                  child: Icon(widget.icon, color: accentColor, size: 24.w),
+                ),
+                14.horizontalSpace,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              widget.title,
+                              style: getTextStyle(
+                                fontSize: 15.sp,
+                                fontWeight: FontWeight.w700,
+                                color: t.text,
+                              ),
+                            ),
+                          ),
+                          AnimatedScale(
+                            scale: isSelected ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOutBack,
+                            child: AnimatedOpacity(
+                              opacity: isSelected ? 1.0 : 0.0,
+                              duration: const Duration(milliseconds: 150),
+                              child: Icon(
+                                Icons.check_circle_rounded,
+                                color: accentColor,
+                                size: 20.w,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      4.verticalSpace,
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.5.h),
+                        decoration: BoxDecoration(
+                          color: accentColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6.r),
+                        ),
+                        child: Text(
+                          widget.badge,
+                          style: TextStyle(
+                            fontSize: 9.sp,
+                            fontWeight: FontWeight.w700,
+                            color: accentColor,
+                          ),
+                        ),
+                      ),
+                      6.verticalSpace,
+                      Text(
+                        widget.description,
+                        style: getTextStyle(
+                          fontSize: 11.sp,
+                          fontWeight: FontWeight.w400,
+                          color: t.textSec,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
