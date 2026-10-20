@@ -14,11 +14,12 @@ class CustomTextField extends StatelessWidget {
   final Widget? suffixIcon;
   final Widget? prefixIcon;
   final int maxLines;
+  final double? fixedHeight;
   final String? Function(String?)? validator;
 
   const CustomTextField({
     super.key,
-    required this.label,
+    this.label = '',
     required this.hintText,
     this.controller,
     this.keyboardType = TextInputType.text,
@@ -26,6 +27,7 @@ class CustomTextField extends StatelessWidget {
     this.suffixIcon,
     this.prefixIcon,
     this.maxLines = 1,
+    this.fixedHeight,
     this.validator,
   });
 
@@ -33,23 +35,20 @@ class CustomTextField extends StatelessWidget {
   Widget build(BuildContext context) {
     Color textColor = AppColors.textPrimary;
     Color subtextColor = AppColors.textSecondary;
-    Color fillColor = AppColors.inputBackground;
-    Color borderColor = AppColors.inputBorder;
-    Color accentColor = AppColors.primary;
+    Color fillColor = const Color(0xFFEEEFF3); // Clean Nestora-style gray fill
 
     try {
       if (Get.isRegistered<ThemeLanguageService>()) {
         final ts = Get.find<ThemeLanguageService>();
         textColor = ts.textColor;
         subtextColor = ts.subtextColor;
-        fillColor = ts.inputFillColor;
-        borderColor = ts.inputBorderColor;
-        accentColor = ts.accentColor;
+        fillColor = ts.isDark ? const Color(0xFF222634) : const Color(0xFFEEEFF3);
       }
     } catch (_) {}
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         if (label.isNotEmpty) ...[
           Text(
@@ -62,51 +61,52 @@ class CustomTextField extends StatelessWidget {
           ),
           8.verticalSpace,
         ],
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          obscureText: obscureText,
-          maxLines: maxLines,
-          validator: validator,
-          style: getTextStyle(
-            fontSize: 15.sp,
-            fontWeight: FontWeight.w500,
-            color: textColor,
+        Container(
+          height: fixedHeight,
+          decoration: BoxDecoration(
+            color: fillColor,
+            borderRadius: BorderRadius.circular(12.r),
           ),
-          decoration: InputDecoration(
-            hintText: hintText,
-            hintStyle: getTextStyle(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w400,
-              color: subtextColor,
-            ),
-            filled: true,
-            fillColor: fillColor,
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: 16.w,
-              vertical: 14.h,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.r),
-              borderSide: BorderSide(color: borderColor),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.r),
-              borderSide: BorderSide(color: borderColor),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.r),
-              borderSide: BorderSide(color: accentColor, width: 1.5),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12.r),
-              borderSide: const BorderSide(color: AppColors.error),
-            ),
-            suffixIcon: suffixIcon,
-            prefixIcon: prefixIcon,
-          ),
+          child: fixedHeight != null
+              ? Center(child: _buildTextFormField(textColor, subtextColor))
+              : _buildTextFormField(textColor, subtextColor),
         ),
       ],
+    );
+  }
+
+  Widget _buildTextFormField(Color textColor, Color subtextColor) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      obscureText: obscureText,
+      maxLines: maxLines,
+      validator: validator,
+      style: getTextStyle(
+        fontSize: 15.sp,
+        fontWeight: FontWeight.w500,
+        color: textColor,
+      ),
+      decoration: InputDecoration(
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        errorBorder: InputBorder.none,
+        focusedErrorBorder: InputBorder.none,
+        isDense: fixedHeight != null,
+        hintText: hintText.isNotEmpty ? hintText : null,
+        hintStyle: getTextStyle(
+          fontSize: 14.sp,
+          fontWeight: FontWeight.w400,
+          color: subtextColor,
+        ),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: 16.w,
+          vertical: 14.h,
+        ),
+        suffixIcon: suffixIcon,
+        prefixIcon: prefixIcon,
+      ),
     );
   }
 }

@@ -269,7 +269,7 @@ class _TransferStockDialogState extends State<TransferStockDialog> {
                           decoration: BoxDecoration(
                             color: themeService.inputFillColor,
                             borderRadius: BorderRadius.circular(10.r),
-                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                            border: Border.all(color: Colors.grey.withValues(alpha: 0.25)),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
