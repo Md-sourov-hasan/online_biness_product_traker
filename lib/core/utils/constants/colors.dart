@@ -50,7 +50,7 @@ class AppColors {
   static const Color backgroundLight = Color(0xFFFFFFFF);
   static const Color backgroundNeutral = Color(0xFFF8FAFC); // Slate 50
   static const Color cardBackground = Color(0xFFFFFFFF);
-  static const Color inputBackground = Color(0xFFF8FAFC);
+  static const Color inputBackground = Color(0xFFEEEFF3);
   static const Color inputBorder = Color(0xFFE2E8F0); // Slate 200
 
   // Dark Theme Colors

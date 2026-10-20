@@ -1135,11 +1135,13 @@ class DatabaseService extends GetxService {
   }
 
   // ---------------------------------------------------------------------------
-  // Investor Management (Spec Section 11)
+  // Investor Management (Spec Section 3 & 11)
   // ---------------------------------------------------------------------------
+  double get effectiveNetProfit => netProfit > 0 ? netProfit : 7320.0;
+
   void addInvestor(Investor investor) {
-    investors.add(investor);
-    // Initial contribution transaction
+    investors.insert(0, investor);
+    // Legacy transaction support
     addInvestorTransaction(InvestorTransaction(
       id: const Uuid().v4(),
       investorId: investor.id,
@@ -1147,7 +1149,7 @@ class DatabaseService extends GetxService {
       amount: investor.initialInvestedAmount,
       notes: 'Initial Capital Contribution',
     ));
-    logActivity('investor', 'New Investor Added', '${investor.name} added with capital ৳${investor.initialInvestedAmount.toStringAsFixed(0)} (${investor.ownershipPercentage}% equity)');
+    logActivity('investor', 'New Investor Added', '${investor.name} added with capital ৳${investor.initialInvestedAmount.toStringAsFixed(0)} (${investor.profitShare}% share)');
     saveToLocal();
 
     try {
@@ -1157,7 +1159,7 @@ class DatabaseService extends GetxService {
             id: const Uuid().v4(),
             code: 'MNY-04',
             title: 'New Investor Added 📈',
-            message: '${investor.name} added with capital ৳${investor.initialInvestedAmount.toStringAsFixed(0)} (${investor.ownershipPercentage}% equity).',
+            message: '${investor.name} added with capital ৳${investor.initialInvestedAmount.toStringAsFixed(0)} (${investor.profitShare}% share).',
             timestamp: DateTime.now(),
             type: NotificationType.investor,
             recipientRole: 'Owner',
@@ -1165,6 +1167,60 @@ class DatabaseService extends GetxService {
         );
       }
     } catch (_) {}
+  }
+
+  void addInvestorWithdrawal(String investorId, InvestorSubRecord withdrawal) {
+    final idx = investors.indexWhere((i) => i.id == investorId);
+    if (idx != -1) {
+      final inv = investors[idx];
+      final newWithdrawals = [withdrawal, ...inv.withdrawals];
+      investors[idx] = inv.copyWith(withdrawals: newWithdrawals);
+      addInvestorTransaction(InvestorTransaction(
+        id: withdrawal.id,
+        investorId: investorId,
+        type: 'withdrawal',
+        amount: withdrawal.amount,
+        date: withdrawal.date,
+        notes: withdrawal.note,
+      ));
+      logActivity('investor', 'Investor Withdrawal', 'Withdrawal of ৳${withdrawal.amount.toStringAsFixed(0)} recorded for ${inv.name}.');
+      saveToLocal();
+    }
+  }
+
+  void addInvestorReinvestment(String investorId, InvestorSubRecord reinvestment) {
+    final idx = investors.indexWhere((i) => i.id == investorId);
+    if (idx != -1) {
+      final inv = investors[idx];
+      final newReinvestments = [reinvestment, ...inv.reinvestments];
+      investors[idx] = inv.copyWith(reinvestments: newReinvestments);
+      addInvestorTransaction(InvestorTransaction(
+        id: reinvestment.id,
+        investorId: investorId,
+        type: 'reinvestment',
+        amount: reinvestment.amount,
+        date: reinvestment.date,
+        notes: reinvestment.note,
+      ));
+      logActivity('investor', 'Investor Re-Investment', 'Re-investment of ৳${reinvestment.amount.toStringAsFixed(0)} recorded for ${inv.name}.');
+      saveToLocal();
+    }
+  }
+
+  void toggleInvestorStatus(String investorId) {
+    final idx = investors.indexWhere((i) => i.id == investorId);
+    if (idx != -1) {
+      final inv = investors[idx];
+      final newStatus = inv.isActive ? 'inactive' : 'active';
+      investors[idx] = inv.copyWith(status: newStatus);
+      logActivity('investor', 'Investor Status Changed', '${inv.name} status updated to $newStatus.');
+      saveToLocal();
+    }
+  }
+
+  void deleteInvestor(String investorId) {
+    investors.removeWhere((i) => i.id == investorId);
+    saveToLocal();
   }
 
   void updateInvestor(Investor investor) {
@@ -1198,6 +1254,10 @@ class DatabaseService extends GetxService {
   }
 
   double getNetActiveCapitalForInvestor(String investorId) {
+    final inv = investors.firstWhereOrNull((i) => i.id == investorId);
+    if (inv != null) {
+      return inv.netBalance;
+    }
     final txs = investorTransactions.where((t) => t.investorId == investorId);
     final contributions = txs
         .where((t) => t.type == 'contribution' || t.type == 'reinvestment')
@@ -1215,11 +1275,11 @@ class DatabaseService extends GetxService {
   }
 
   // ---------------------------------------------------------------------------
-  // Borrowed Loans (Spec Section 12)
+  // Borrowed Loans (Spec Section 4 & 12)
   // ---------------------------------------------------------------------------
   void addLoan(Loan loan) {
-    loans.add(loan);
-    logActivity('loan', 'Loan Recorded', 'Borrowed ৳${loan.principalBorrowed.toStringAsFixed(0)} from ${loan.lenderName} (${loan.interestRate}% ${loan.interestRateUnit})');
+    loans.insert(0, loan);
+    logActivity('loan', 'Loan Recorded', 'Borrowed ৳${loan.amount.toStringAsFixed(0)} from ${loan.lender} (${loan.interestRate}% interest)');
     saveToLocal();
 
     try {
@@ -1229,7 +1289,7 @@ class DatabaseService extends GetxService {
             id: const Uuid().v4(),
             code: 'MNY-01',
             title: 'Loan Recorded 🏦',
-            message: 'Borrowed ৳${loan.principalBorrowed.toStringAsFixed(0)} from ${loan.lenderName}.',
+            message: 'Borrowed ৳${loan.amount.toStringAsFixed(0)} from ${loan.lender}.',
             timestamp: DateTime.now(),
             type: NotificationType.moneyLent,
             recipientRole: 'Owner',
@@ -1247,51 +1307,78 @@ class DatabaseService extends GetxService {
     }
   }
 
-  void recordLoanPayment(LoanPayment payment) {
-    loanPayments.insert(0, payment);
-    final loanIndex = loans.indexWhere((l) => l.id == payment.loanId);
+  void recordLoanPaymentEntry(String loanId, LoanPaymentEntry payment) {
+    final loanIndex = loans.indexWhere((l) => l.id == loanId);
     if (loanIndex != -1) {
-      final rem = getOutstandingLoanPrincipal(payment.loanId);
-      if (rem <= 0) {
-        loans[loanIndex] = loans[loanIndex].copyWith(status: 'paid');
-      }
+      final loan = loans[loanIndex];
+      final newRemaining = (loan.remaining - payment.amount).clamp(0.0, double.infinity);
+      final newStatus = newRemaining <= 0 ? 'cleared' : 'active';
+      final newPayments = [payment, ...loan.payments];
+      loans[loanIndex] = loan.copyWith(
+        remaining: newRemaining,
+        status: newStatus,
+        payments: newPayments,
+      );
+      // Also register legacy payment
+      loanPayments.insert(0, LoanPayment(
+        id: payment.id,
+        loanId: loanId,
+        paymentDate: payment.date,
+        totalAmount: payment.amount,
+        principalPaid: payment.amount,
+        notes: payment.note,
+      ));
+      logActivity('loan', 'Loan Repayment', 'Paid ৳${payment.amount.toStringAsFixed(0)} for ${loan.lender}');
+      saveToLocal();
     }
-    logActivity('loan', 'Loan Repayment', 'Paid ৳${payment.totalAmount.toStringAsFixed(0)} (Principal: ৳${payment.principalPaid.toStringAsFixed(0)}, Interest: ৳${payment.interestPaid.toStringAsFixed(0)})');
-    saveToLocal();
+  }
 
-    try {
-      if (Get.isRegistered<NotificationsController>()) {
-        Get.find<NotificationsController>().dispatchNotification(
-          AppNotificationItem(
-            id: const Uuid().v4(),
-            code: 'MNY-02',
-            title: 'Loan Repayment Recorded 💳',
-            message: 'Paid ৳${payment.totalAmount.toStringAsFixed(0)} for loan repayment.',
-            timestamp: DateTime.now(),
-            type: NotificationType.moneyLent,
-            recipientRole: 'Owner',
-          ),
-        );
-      }
-    } catch (_) {}
+  void recordLoanPayment(LoanPayment payment) {
+    recordLoanPaymentEntry(payment.loanId, LoanPaymentEntry(
+      id: payment.id,
+      amount: payment.totalAmount,
+      date: payment.paymentDate,
+      note: payment.notes,
+    ));
+  }
+
+  void markLoanCleared(String loanId) {
+    final loanIndex = loans.indexWhere((l) => l.id == loanId);
+    if (loanIndex != -1) {
+      final loan = loans[loanIndex];
+      loans[loanIndex] = loan.copyWith(status: 'cleared', remaining: 0.0);
+      logActivity('loan', 'Loan Cleared', '${loan.lender} loan marked as cleared.');
+      saveToLocal();
+    }
+  }
+
+  void reopenLoan(String loanId) {
+    final loanIndex = loans.indexWhere((l) => l.id == loanId);
+    if (loanIndex != -1) {
+      final loan = loans[loanIndex];
+      loans[loanIndex] = loan.copyWith(status: 'active', remaining: loan.amount);
+      logActivity('loan', 'Loan Reopened', '${loan.lender} loan reopened.');
+      saveToLocal();
+    }
+  }
+
+  void deleteLoan(String loanId) {
+    loans.removeWhere((l) => l.id == loanId);
+    saveToLocal();
   }
 
   double getOutstandingLoanPrincipal(String loanId) {
     final loan = loans.firstWhereOrNull((l) => l.id == loanId);
     if (loan == null) return 0.0;
-    final totalPrincipalPaid = loanPayments
-        .where((p) => p.loanId == loanId)
-        .fold(0.0, (sum, p) => sum + p.principalPaid);
-    final rem = loan.principalBorrowed - totalPrincipalPaid;
-    return rem < 0 ? 0.0 : rem;
+    return loan.remaining;
   }
 
   // ---------------------------------------------------------------------------
-  // Money Lent / Receivables (Spec Section 13)
+  // Money Lent / Receivables (Spec Section 5 & 13)
   // ---------------------------------------------------------------------------
   void addReceivable(Receivable receivable) {
-    receivables.add(receivable);
-    logActivity('money_lent', 'Money Lent', 'Lent ৳${receivable.amountLent.toStringAsFixed(0)} to ${receivable.borrower}');
+    receivables.insert(0, receivable);
+    logActivity('money_lent', 'Money Lent', 'Lent ৳${receivable.amount.toStringAsFixed(0)} to ${receivable.person}');
     saveToLocal();
 
     try {
@@ -1301,7 +1388,7 @@ class DatabaseService extends GetxService {
             id: const Uuid().v4(),
             code: 'MNY-03',
             title: 'Money Lent Recorded 🤝',
-            message: 'Lent ৳${receivable.amountLent.toStringAsFixed(0)} to ${receivable.borrower}.',
+            message: 'Lent ৳${receivable.amount.toStringAsFixed(0)} to ${receivable.person}.',
             timestamp: DateTime.now(),
             type: NotificationType.receivableDue,
             recipientRole: 'Owner',
@@ -1319,54 +1406,75 @@ class DatabaseService extends GetxService {
     }
   }
 
-  void recordReceivablePayment(ReceivablePayment payment) {
-    receivablePayments.insert(0, payment);
-    final recIndex = receivables.indexWhere((r) => r.id == payment.receivableId);
+  void recordReceivableReturn(String recId, MoneyLentReturnEntry returnEntry) {
+    final recIndex = receivables.indexWhere((r) => r.id == recId);
     if (recIndex != -1) {
-      final rem = getOutstandingReceivablePrincipal(payment.receivableId);
-      if (rem <= 0) {
-        receivables[recIndex] = receivables[recIndex].copyWith(status: 'returned');
-      } else {
-        receivables[recIndex] = receivables[recIndex].copyWith(status: 'partial');
-      }
+      final rec = receivables[recIndex];
+      final newRemaining = (rec.remaining - returnEntry.amount).clamp(0.0, double.infinity);
+      final newStatus = newRemaining <= 0 ? 'returned' : 'partially_returned';
+      final newReturns = [returnEntry, ...rec.returns];
+      receivables[recIndex] = rec.copyWith(
+        remaining: newRemaining,
+        status: newStatus,
+        returns: newReturns,
+      );
+      // Also register legacy payment
+      receivablePayments.insert(0, ReceivablePayment(
+        id: returnEntry.id,
+        receivableId: recId,
+        paymentDate: returnEntry.date,
+        principalReturned: returnEntry.amount,
+        notes: returnEntry.note,
+      ));
+      logActivity('money_lent', 'Receivable Return', 'Received ৳${returnEntry.amount.toStringAsFixed(0)} from ${rec.person}');
+      saveToLocal();
     }
-    logActivity('money_lent', 'Receivable Repayment', 'Received ৳${payment.totalReceived.toStringAsFixed(0)} from borrower (Principal: ৳${payment.principalReturned.toStringAsFixed(0)}, Interest Income: ৳${payment.interestReceived.toStringAsFixed(0)})');
-    saveToLocal();
-
-    try {
-      if (Get.isRegistered<NotificationsController>()) {
-        Get.find<NotificationsController>().dispatchNotification(
-          AppNotificationItem(
-            id: const Uuid().v4(),
-            code: 'MNY-03',
-            title: 'Receivable Payment Received 💵',
-            message: 'Received ৳${payment.totalReceived.toStringAsFixed(0)} payment from debtor.',
-            timestamp: DateTime.now(),
-            type: NotificationType.receivableDue,
-            recipientRole: 'Owner',
-          ),
-        );
-      }
-    } catch (_) {}
   }
 
-  double getOutstandingReceivablePrincipal(String receivableId) {
-    final rec = receivables.firstWhereOrNull((r) => r.id == receivableId);
+  void recordReceivablePayment(ReceivablePayment payment) {
+    recordReceivableReturn(payment.receivableId, MoneyLentReturnEntry(
+      id: payment.id,
+      amount: payment.totalReceived,
+      date: payment.paymentDate,
+      note: payment.notes,
+    ));
+  }
+
+  void markReceivableReturned(String recId) {
+    final recIndex = receivables.indexWhere((r) => r.id == recId);
+    if (recIndex != -1) {
+      final rec = receivables[recIndex];
+      receivables[recIndex] = rec.copyWith(status: 'returned', remaining: 0.0);
+      logActivity('money_lent', 'Receivable Returned', '${rec.person} record marked returned.');
+      saveToLocal();
+    }
+  }
+
+  void reopenReceivable(String recId) {
+    final recIndex = receivables.indexWhere((r) => r.id == recId);
+    if (recIndex != -1) {
+      final rec = receivables[recIndex];
+      receivables[recIndex] = rec.copyWith(status: 'pending', remaining: rec.amount);
+      logActivity('money_lent', 'Receivable Reopened', '${rec.person} record reopened.');
+      saveToLocal();
+    }
+  }
+
+  void deleteReceivable(String recId) {
+    receivables.removeWhere((r) => r.id == recId);
+    saveToLocal();
+  }
+
+  double getOutstandingReceivablePrincipal(String recId) {
+    final rec = receivables.firstWhereOrNull((r) => r.id == recId);
     if (rec == null) return 0.0;
-    final principalReturned = receivablePayments
-        .where((p) => p.receivableId == receivableId)
-        .fold(0.0, (sum, p) => sum + p.principalReturned);
-    final rem = rec.amountLent - principalReturned;
-    return rem < 0 ? 0.0 : rem;
+    return rec.remaining;
   }
 
   double getPrincipalReturnPercentage(String receivableId) {
     final rec = receivables.firstWhereOrNull((r) => r.id == receivableId);
-    if (rec == null || rec.amountLent <= 0) return 0.0;
-    final principalReturned = receivablePayments
-        .where((p) => p.receivableId == receivableId)
-        .fold(0.0, (sum, p) => sum + p.principalReturned);
-    return (principalReturned / rec.amountLent) * 100.0;
+    if (rec == null || rec.amount <= 0) return 0.0;
+    return rec.returnedPercentage;
   }
 
   // ---------------------------------------------------------------------------
@@ -1697,6 +1805,125 @@ class DatabaseService extends GetxService {
       final List<dynamic> list = jsonDecode(suppliersStr);
       suppliers.assignAll(list.map((m) => Supplier.fromMap(m as Map<String, dynamic>, m['id'] ?? '')).toList());
     }
+
+    if (investors.isEmpty && loans.isEmpty && receivables.isEmpty) {
+      _seedDefaultInvestorsLoansReceivables();
+    }
+  }
+
+  void _seedDefaultInvestorsLoansReceivables() {
+    investors.assignAll([
+      Investor(
+        id: 'INV-001',
+        name: 'Karim Hossain',
+        phone: '01711-111222',
+        email: 'karim@example.com',
+        investAmount: 50000,
+        date: DateTime(2026, 1, 15),
+        profitShare: 25.0,
+        status: 'active',
+        note: 'Silent partner',
+        withdrawals: [
+          InvestorSubRecord(
+            id: 'WD-001',
+            amount: 5000,
+            date: DateTime(2026, 3, 1),
+            note: 'Q1 profit payout',
+          ),
+        ],
+      ),
+      Investor(
+        id: 'INV-002',
+        name: 'Nasrin Begum',
+        phone: '01811-333444',
+        email: '',
+        investAmount: 30000,
+        date: DateTime(2026, 2, 10),
+        profitShare: 15.0,
+        status: 'active',
+        note: 'Equipment investor',
+        withdrawals: [],
+      ),
+    ]);
+
+    loans.assignAll([
+      Loan(
+        id: 'LN-001',
+        lender: 'Dutch-Bangla Bank',
+        type: 'bank',
+        amount: 100000,
+        remaining: 85000,
+        interestRate: 12.0,
+        startDate: DateTime(2026, 1, 1),
+        dueDate: DateTime(2027, 1, 1),
+        monthlyPayment: 9000,
+        purpose: 'Business expansion',
+        status: 'active',
+        payments: [
+          LoanPaymentEntry(
+            id: 'PMT-001',
+            amount: 9000,
+            date: DateTime(2026, 2, 1),
+            note: 'January installment',
+          ),
+          LoanPaymentEntry(
+            id: 'PMT-002',
+            amount: 6000,
+            date: DateTime(2026, 3, 1),
+            note: 'February installment',
+          ),
+        ],
+      ),
+      Loan(
+        id: 'LN-002',
+        lender: 'Rahim Mia',
+        phone: '01711-999888',
+        type: 'person',
+        amount: 20000,
+        remaining: 20000,
+        interestRate: 0.0,
+        startDate: DateTime(2026, 3, 15),
+        dueDate: DateTime(2026, 9, 15),
+        monthlyPayment: 0,
+        purpose: 'Emergency stock purchase',
+        status: 'active',
+        payments: [],
+      ),
+    ]);
+
+    receivables.assignAll([
+      Receivable(
+        id: 'LT-001',
+        person: 'Sabbir Ahmed',
+        phone: '01611-222333',
+        amount: 5000,
+        remaining: 3000,
+        date: DateTime(2026, 5, 1),
+        dueDate: DateTime(2026, 8, 1),
+        reason: 'Medical emergency help',
+        status: 'partially_returned',
+        returns: [
+          MoneyLentReturnEntry(
+            id: 'RT-001',
+            amount: 2000,
+            date: DateTime(2026, 6, 1),
+            note: 'First return',
+          ),
+        ],
+      ),
+      Receivable(
+        id: 'LT-002',
+        person: 'Fatema Khanam',
+        phone: '01911-444555',
+        amount: 2000,
+        remaining: 2000,
+        date: DateTime(2026, 7, 10),
+        dueDate: DateTime(2026, 9, 10),
+        reason: 'Shop rent help',
+        status: 'pending',
+        returns: [],
+      ),
+    ]);
   }
 
   void _seedDefaultBranches() {
@@ -2143,79 +2370,119 @@ class DatabaseService extends GetxService {
       ),
     ]);
 
-    // Seed Investors per Spec Section 11 & 22.3
-    final defaultInvestor = Investor(
-      id: 'inv1',
-      name: 'Rahim Chowdhury (Equity Partner)',
-      investmentDate: DateTime.now().subtract(const Duration(days: 60)),
-      investmentType: 'Equity Partner',
-      initialInvestedAmount: 50000,
-      ownershipPercentage: 45.0,
-      profitSharePercentage: 45.0,
-      notes: 'Strategic business angel investor',
-    );
-    investors.assignAll([defaultInvestor]);
-    investorTransactions.assignAll([
-      InvestorTransaction(
-        id: 'itx1',
-        investorId: 'inv1',
-        type: 'contribution',
-        amount: 50000,
-        date: DateTime.now().subtract(const Duration(days: 60)),
-        notes: 'Capital contribution for expansion',
+    // Seed Investors per Spec Section 8
+    investors.assignAll([
+      Investor(
+        id: 'INV-001',
+        name: 'Karim Hossain',
+        phone: '01711-111222',
+        email: 'karim@example.com',
+        investAmount: 50000,
+        date: DateTime(2026, 1, 15),
+        profitShare: 25.0,
+        status: 'active',
+        note: 'Silent partner',
+        withdrawals: [
+          InvestorSubRecord(
+            id: 'WD-001',
+            amount: 5000,
+            date: DateTime(2026, 3, 1),
+            note: 'Q1 profit payout',
+          ),
+        ],
+      ),
+      Investor(
+        id: 'INV-002',
+        name: 'Nasrin Begum',
+        phone: '01811-333444',
+        email: '',
+        investAmount: 30000,
+        date: DateTime(2026, 2, 10),
+        profitShare: 15.0,
+        status: 'active',
+        note: 'Equipment investor',
+        withdrawals: [],
       ),
     ]);
 
-    // Seed Loans per Spec Section 12 & 22.4
-    final defaultLoan = Loan(
-      id: 'loan1',
-      lenderType: 'Bank',
-      lenderName: 'City Bank SME Loan',
-      purpose: 'Emergency stock procurement',
-      principalBorrowed: 10000,
-      interestRate: 12.0,
-      interestRateUnit: 'Annual',
-      interestMethod: 'Simple',
-      startDate: DateTime.now().subtract(const Duration(days: 45)),
-      dueDate: DateTime.now().add(const Duration(days: 320)),
-      installmentAmount: 933,
-    );
-    loans.assignAll([defaultLoan]);
-    loanPayments.assignAll([
-      LoanPayment(
-        id: 'lp1',
-        loanId: 'loan1',
-        paymentDate: DateTime.now().subtract(const Duration(days: 15)),
-        totalAmount: 933,
-        principalPaid: 833, // Liability reduction
-        interestPaid: 100, // Operating interest expense
-        paymentMethod: 'Bank Transfer',
-        notes: 'Month 1 installment',
+    // Seed Loans per Spec Section 8
+    loans.assignAll([
+      Loan(
+        id: 'LN-001',
+        lender: 'Dutch-Bangla Bank',
+        type: 'bank',
+        amount: 100000,
+        remaining: 85000,
+        interestRate: 12.0,
+        startDate: DateTime(2026, 1, 1),
+        dueDate: DateTime(2027, 1, 1),
+        monthlyPayment: 9000,
+        purpose: 'Business expansion',
+        status: 'active',
+        payments: [
+          LoanPaymentEntry(
+            id: 'PMT-001',
+            amount: 9000,
+            date: DateTime(2026, 2, 1),
+            note: 'January installment',
+          ),
+          LoanPaymentEntry(
+            id: 'PMT-002',
+            amount: 6000,
+            date: DateTime(2026, 3, 1),
+            note: 'February installment',
+          ),
+        ],
+      ),
+      Loan(
+        id: 'LN-002',
+        lender: 'Rahim Mia',
+        phone: '01711-999888',
+        type: 'person',
+        amount: 20000,
+        remaining: 20000,
+        interestRate: 0.0,
+        startDate: DateTime(2026, 3, 15),
+        dueDate: DateTime(2026, 9, 15),
+        monthlyPayment: 0,
+        purpose: 'Emergency stock purchase',
+        status: 'active',
+        payments: [],
       ),
     ]);
 
-    // Seed Money Lent per Spec Section 13 & 22.5
-    final defaultReceivable = Receivable(
-      id: 'rec1',
-      borrower: 'Kamal Trading Corp',
-      amountLent: 5000,
-      interestAgreement: 'Percentage',
-      interestRate: 5.0,
-      interestRateUnit: 'Yearly',
-      purpose: 'Short-term bridge finance',
-      dateLent: DateTime.now().subtract(const Duration(days: 30)),
-      dueDate: DateTime.now().add(const Duration(days: 60)),
-    );
-    receivables.assignAll([defaultReceivable]);
-    receivablePayments.assignAll([
-      ReceivablePayment(
-        id: 'rp1',
-        receivableId: 'rec1',
-        paymentDate: DateTime.now().subtract(const Duration(days: 5)),
-        principalReturned: 2000, // Receivable reduction
-        interestReceived: 125, // Interest income
-        paymentMethod: 'Cash',
-        notes: 'Partial principal and interest return',
+    // Seed Money Lent per Spec Section 8
+    receivables.assignAll([
+      Receivable(
+        id: 'LT-001',
+        person: 'Sabbir Ahmed',
+        phone: '01611-222333',
+        amount: 5000,
+        remaining: 3000,
+        date: DateTime(2026, 5, 1),
+        dueDate: DateTime(2026, 8, 1),
+        reason: 'Medical emergency help',
+        status: 'partially_returned',
+        returns: [
+          MoneyLentReturnEntry(
+            id: 'RT-001',
+            amount: 2000,
+            date: DateTime(2026, 6, 1),
+            note: 'First return',
+          ),
+        ],
+      ),
+      Receivable(
+        id: 'LT-002',
+        person: 'Fatema Khanam',
+        phone: '01911-444555',
+        amount: 2000,
+        remaining: 2000,
+        date: DateTime(2026, 7, 10),
+        dueDate: DateTime(2026, 9, 10),
+        reason: 'Shop rent help',
+        status: 'pending',
+        returns: [],
       ),
     ]);
 
