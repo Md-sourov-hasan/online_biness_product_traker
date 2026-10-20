@@ -1,47 +1,89 @@
-class Investor {
+class InvestorSubRecord {
   final String id;
-  final String name;
-  final DateTime investmentDate;
-  final String investmentType; // 'Equity Partner', 'Profit-Share Partner', 'Fixed ROI', 'Silent Partner'
-  final double initialInvestedAmount;
-  final double ownershipPercentage; // Equity %
-  final double profitSharePercentage; // Profit-share % (can differ from equity)
-  final double agreedRoiPercentage; // For fixed-return model
-  final String status; // 'active', 'inactive'
-  final String notes;
-  final DateTime createdAt;
+  final double amount;
+  final DateTime date;
+  final String note;
+
+  InvestorSubRecord({
+    required this.id,
+    required this.amount,
+    required this.date,
+    this.note = '',
+  });
+
+  factory InvestorSubRecord.fromMap(Map<String, dynamic> data, String id) {
+    DateTime parseDate(dynamic val) {
+      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
+      return DateTime.now();
+    }
+
+    return InvestorSubRecord(
+      id: id,
+      amount: (data['amount'] ?? 0.0).toDouble(),
+      date: parseDate(data['date']),
+      note: data['note'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'amount': amount,
+      'date': date.toIso8601String(),
+      'note': note,
+    };
+  }
+}
+
+class Investor {
+  final String id; // INV-001 style
+  final String name; // required
+  final String phone; // optional
+  final String email; // optional
+  final double investAmount; // initial investment, required
+  final DateTime date; // investment / join date
+  final double profitShare; // number (percent), default 0
+  final String status; // 'active' / 'inactive', default 'active'
+  final String note; // optional
+  final List<InvestorSubRecord> withdrawals; // list of {id, amount, date, note}
+  final List<InvestorSubRecord> reinvestments; // list of {id, amount, date, note}
 
   Investor({
     required this.id,
     required this.name,
-    DateTime? investmentDate,
-    this.investmentType = 'Equity Partner',
-    required this.initialInvestedAmount,
-    this.ownershipPercentage = 0.0,
-    this.profitSharePercentage = 0.0,
-    this.agreedRoiPercentage = 0.0,
+    this.phone = '',
+    this.email = '',
+    required this.investAmount,
+    DateTime? date,
+    this.profitShare = 0.0,
     this.status = 'active',
-    this.notes = '',
-    DateTime? createdAt,
-  })  : investmentDate = investmentDate ?? DateTime.now(),
-        createdAt = createdAt ?? DateTime.now();
+    this.note = '',
+    List<InvestorSubRecord>? withdrawals,
+    List<InvestorSubRecord>? reinvestments,
+  })  : date = date ?? DateTime.now(),
+        withdrawals = withdrawals ?? [],
+        reinvestments = reinvestments ?? [];
 
-  // Core Equity Formulas per Spec Section 11.2 & 11.3
-  double get postMoneyValuation {
-    if (ownershipPercentage <= 0) return 0.0;
-    return initialInvestedAmount / (ownershipPercentage / 100.0);
+  // --- Spec Section 3 Formulas ---
+  double get totalReinvestments => reinvestments.fold(0.0, (sum, r) => sum + r.amount);
+  double get totalReinvested => totalReinvestments;
+  double get totalWithdrawn => withdrawals.fold(0.0, (sum, w) => sum + w.amount);
+  double get totalInvested => investAmount + totalReinvestments;
+  double get netBalance => totalInvested - totalWithdrawn;
+  bool get isActive => status.toLowerCase() == 'active';
+
+  double calculateProfitDue(double netProfit) {
+    if (profitShare <= 0) return 0.0;
+    return netProfit * profitShare / 100.0;
   }
 
-  double get preMoneyValuation {
-    final post = postMoneyValuation;
-    if (post <= 0) return 0.0;
-    return post - initialInvestedAmount;
-  }
-
-  double calculateProfitDistribution(double distributableProfit) {
-    if (profitSharePercentage <= 0) return 0.0;
-    return distributableProfit * (profitSharePercentage / 100.0);
-  }
+  // Backward compatibility getters
+  double get initialInvestedAmount => investAmount;
+  double get profitSharePercentage => profitShare;
+  double get ownershipPercentage => profitShare;
+  DateTime get investmentDate => date;
+  String get notes => note;
 
   factory Investor.fromMap(Map<String, dynamic> data, String id) {
     DateTime parseDate(dynamic val) {
@@ -50,18 +92,34 @@ class Investor {
       return DateTime.now();
     }
 
+    final rawWithdrawals = data['withdrawals'] as List<dynamic>? ?? [];
+    final withdrawals = rawWithdrawals.map((w) {
+      if (w is Map<String, dynamic>) {
+        return InvestorSubRecord.fromMap(w, w['id']?.toString() ?? '');
+      }
+      return InvestorSubRecord(id: '', amount: 0, date: DateTime.now());
+    }).where((w) => w.id.isNotEmpty).toList();
+
+    final rawReinvestments = data['reinvestments'] as List<dynamic>? ?? [];
+    final reinvestments = rawReinvestments.map((r) {
+      if (r is Map<String, dynamic>) {
+        return InvestorSubRecord.fromMap(r, r['id']?.toString() ?? '');
+      }
+      return InvestorSubRecord(id: '', amount: 0, date: DateTime.now());
+    }).where((r) => r.id.isNotEmpty).toList();
+
     return Investor(
       id: id,
       name: data['name'] ?? '',
-      investmentDate: parseDate(data['investmentDate']),
-      investmentType: data['investmentType'] ?? 'Equity Partner',
-      initialInvestedAmount: (data['initialInvestedAmount'] ?? 0.0).toDouble(),
-      ownershipPercentage: (data['ownershipPercentage'] ?? 0.0).toDouble(),
-      profitSharePercentage: (data['profitSharePercentage'] ?? 0.0).toDouble(),
-      agreedRoiPercentage: (data['agreedRoiPercentage'] ?? 0.0).toDouble(),
+      phone: data['phone'] ?? '',
+      email: data['email'] ?? '',
+      investAmount: (data['investAmount'] ?? data['initialInvestedAmount'] ?? 0.0).toDouble(),
+      date: parseDate(data['date'] ?? data['investmentDate']),
+      profitShare: (data['profitShare'] ?? data['profitSharePercentage'] ?? data['ownershipPercentage'] ?? 0.0).toDouble(),
       status: data['status'] ?? 'active',
-      notes: data['notes'] ?? '',
-      createdAt: parseDate(data['createdAt']),
+      note: data['note'] ?? data['notes'] ?? '',
+      withdrawals: withdrawals,
+      reinvestments: reinvestments,
     );
   }
 
@@ -69,47 +127,48 @@ class Investor {
     return {
       'id': id,
       'name': name,
-      'investmentDate': investmentDate.toIso8601String(),
-      'investmentType': investmentType,
-      'initialInvestedAmount': initialInvestedAmount,
-      'ownershipPercentage': ownershipPercentage,
-      'profitSharePercentage': profitSharePercentage,
-      'agreedRoiPercentage': agreedRoiPercentage,
+      'phone': phone,
+      'email': email,
+      'investAmount': investAmount,
+      'date': date.toIso8601String(),
+      'profitShare': profitShare,
       'status': status,
-      'notes': notes,
-      'createdAt': createdAt.toIso8601String(),
+      'note': note,
+      'withdrawals': withdrawals.map((w) => w.toMap()).toList(),
+      'reinvestments': reinvestments.map((r) => r.toMap()).toList(),
     };
   }
 
   Investor copyWith({
     String? id,
     String? name,
-    DateTime? investmentDate,
-    String? investmentType,
-    double? initialInvestedAmount,
-    double? ownershipPercentage,
-    double? profitSharePercentage,
-    double? agreedRoiPercentage,
+    String? phone,
+    String? email,
+    double? investAmount,
+    DateTime? date,
+    double? profitShare,
     String? status,
-    String? notes,
-    DateTime? createdAt,
+    String? note,
+    List<InvestorSubRecord>? withdrawals,
+    List<InvestorSubRecord>? reinvestments,
   }) {
     return Investor(
       id: id ?? this.id,
       name: name ?? this.name,
-      investmentDate: investmentDate ?? this.investmentDate,
-      investmentType: investmentType ?? this.investmentType,
-      initialInvestedAmount: initialInvestedAmount ?? this.initialInvestedAmount,
-      ownershipPercentage: ownershipPercentage ?? this.ownershipPercentage,
-      profitSharePercentage: profitSharePercentage ?? this.profitSharePercentage,
-      agreedRoiPercentage: agreedRoiPercentage ?? this.agreedRoiPercentage,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      investAmount: investAmount ?? this.investAmount,
+      date: date ?? this.date,
+      profitShare: profitShare ?? this.profitShare,
       status: status ?? this.status,
-      notes: notes ?? this.notes,
-      createdAt: createdAt ?? this.createdAt,
+      note: note ?? this.note,
+      withdrawals: withdrawals ?? this.withdrawals,
+      reinvestments: reinvestments ?? this.reinvestments,
     );
   }
 }
 
+// Retain legacy class definition if used in older code/tests
 class InvestorTransaction {
   final String id;
   final String investorId;

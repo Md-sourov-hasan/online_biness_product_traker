@@ -147,7 +147,7 @@ class StockMateThemes {
     purpleLight: Color(0xFFEDE9FE),
     nav: Color(0xFFFFFFFF),
     card: Color(0xFFFFFFFF),
-    input: Color(0xFFF9FAFB),
+    input: Color(0xFFEEEFF3),
     shadow: Color(0x14000000), // rgba(0,0,0,0.08)
     chartBar: [
       Color(0xFF4F6EF7),

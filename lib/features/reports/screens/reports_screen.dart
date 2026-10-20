@@ -913,24 +913,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     // Live loans
     final liveLoans = db.loans;
-    final totalLoanDebt = liveLoans.fold(0.0, (sum, l) => sum + db.getOutstandingLoanPrincipal(l.id));
+    final totalLoanDebt = liveLoans
+        .where((l) => l.status.toLowerCase() != 'cleared' && l.remaining > 0)
+        .fold(0.0, (sum, l) => sum + l.remaining);
 
     // Live receivables (money lent)
     final liveReceivables = db.receivables;
-    final totalMoneyLent = liveReceivables.fold(0.0, (sum, r) => sum + db.getOutstandingReceivablePrincipal(r.id));
+    final totalMoneyLent = liveReceivables.fold(0.0, (sum, r) => sum + r.remaining);
 
-    // Live investors
-    final liveInvestors = db.investors.where((i) => i.profitSharePercentage > 0 || i.ownershipPercentage > 0).toList();
-    final double netProfitYear = 7320.0;
+    // Live investors with profitShare > 0
+    final liveInvestors = db.investors.where((i) => i.profitShare > 0).toList();
+    final double netProfitYear = db.effectiveNetProfit;
     double totalToInvestors = 0.0;
     if (liveInvestors.isNotEmpty) {
       totalToInvestors = liveInvestors.fold(0.0, (sum, i) {
-        final share = i.profitSharePercentage > 0 ? i.profitSharePercentage : i.ownershipPercentage;
-        return sum + (netProfitYear * (share / 100));
+        return sum + i.calculateProfitDue(netProfitYear);
       });
-    } else {
-      // Prototype demo investors: 25% and 15%
-      totalToInvestors = (netProfitYear * 0.25) + (netProfitYear * 0.15); // 1830 + 1098 = 2928
     }
     final ownerProfit = netProfitYear - totalToInvestors;
 
@@ -1029,10 +1027,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
 
               // Block 5: 🏦 Loan Liabilities (warningLight / warning)
-              _buildPlLoansBlock(t, currency, liveLoans, totalLoanDebt, db),
+              _buildPlLoansBlock(t, currency, liveLoans, totalLoanDebt),
 
               // Block 6: 🤝 Money Lent Out (accentLight / accent)
-              _buildPlMoneyLentBlock(t, currency, liveReceivables, totalMoneyLent, db),
+              _buildPlMoneyLentBlock(t, currency, liveReceivables, totalMoneyLent),
 
               // Block 7: NET PROFIT Box (gradient purple+22 to accent+22, border purple+44)
               Container(
@@ -1078,7 +1076,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
 
               // Block 8: 👥 Investor Profit Distribution (purpleLight / purple)
-              _buildPlInvestorBlock(t, currency, liveInvestors, totalToInvestors, ownerProfit),
+              _buildPlInvestorBlock(t, currency, liveInvestors, totalToInvestors, ownerProfit, netProfitYear),
             ],
           ),
         ),
@@ -1168,7 +1166,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildPlLoansBlock(ThemeTokens t, String currency, List<Loan> liveLoans, double totalLoanDebt, DatabaseService db) {
+  Widget _buildPlLoansBlock(ThemeTokens t, String currency, List<Loan> liveLoans, double totalLoanDebt) {
+    if (liveLoans.isEmpty) return const SizedBox.shrink();
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1189,51 +1189,45 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          if (liveLoans.isNotEmpty)
-            ...liveLoans.map((l) {
-              final remaining = db.getOutstandingLoanPrincipal(l.id);
-              final isCleared = l.status == 'cleared' || l.status == 'paid' || remaining <= 0;
-              return Container(
-                padding: const EdgeInsets.symmetric(vertical: 5),
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: t.withHexSuffix(t.warning, "22"), width: 1)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: RichText(
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        text: TextSpan(
-                          style: TextStyle(fontSize: 12, color: t.text, fontFamily: 'SF Pro Display'),
-                          children: [
-                            TextSpan(text: l.lenderName),
-                            TextSpan(
-                              text: isCleared ? ' (Cleared)' : ' (Active)',
-                              style: TextStyle(fontSize: 10, color: t.textSec),
-                            ),
-                          ],
-                        ),
+          ...liveLoans.map((l) {
+            final isCleared = l.isCleared;
+            return Container(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: t.withHexSuffix(t.warning, "22"), width: 1)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: RichText(
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        style: TextStyle(fontSize: 12, color: t.text, fontFamily: 'SF Pro Display'),
+                        children: [
+                          TextSpan(text: l.lender),
+                          TextSpan(
+                            text: isCleared ? ' (Cleared)' : ' (Active)',
+                            style: TextStyle(fontSize: 10, color: t.textSec),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      isCleared ? '✅ Cleared' : '${fmt(remaining > 0 ? remaining : l.principalBorrowed, currency)} left',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: isCleared ? t.success : t.danger,
-                      ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isCleared ? '✅ Cleared' : '${fmt(l.remaining, currency)} left',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: isCleared ? t.success : t.danger,
                     ),
-                  ],
-                ),
-              );
-            })
-          else ...[
-            _buildSampleLoanRow("BRAC Bank Commercial", "(Active)", "${fmt(100000, currency)} left", false, t),
-            _buildSampleLoanRow("City Bank SME Facility", "(Active)", "${fmt(5000, currency)} left", false, t),
-          ],
+                  ),
+                ],
+              ),
+            );
+          }),
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Row(
@@ -1244,7 +1238,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: t.warning),
                 ),
                 Text(
-                  fmt(totalLoanDebt > 0 ? totalLoanDebt : 105000, currency),
+                  fmt(totalLoanDebt, currency),
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: t.danger),
                 ),
               ],
@@ -1255,43 +1249,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildSampleLoanRow(String lender, String status, String rightText, bool isCleared, ThemeTokens t) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: t.withHexSuffix(t.warning, "22"), width: 1)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: RichText(
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              text: TextSpan(
-                style: TextStyle(fontSize: 12, color: t.text, fontFamily: 'SF Pro Display'),
-                children: [
-                  TextSpan(text: lender),
-                  TextSpan(text: ' $status', style: TextStyle(fontSize: 10, color: t.textSec)),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            rightText,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: isCleared ? t.success : t.danger,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildPlMoneyLentBlock(ThemeTokens t, String currency, List<Receivable> liveReceivables, double totalMoneyLent) {
+    if (liveReceivables.isEmpty) return const SizedBox.shrink();
 
-  Widget _buildPlMoneyLentBlock(ThemeTokens t, String currency, List<Receivable> liveReceivables, double totalMoneyLent, DatabaseService db) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1312,50 +1272,46 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          if (liveReceivables.isNotEmpty)
-            ...liveReceivables.map((r) {
-              final remaining = db.getOutstandingReceivablePrincipal(r.id);
-              final isReturned = r.status == 'returned' || remaining <= 0;
-              return Container(
-                padding: const EdgeInsets.symmetric(vertical: 5),
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: t.withHexSuffix(t.accent, "22"), width: 1)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: RichText(
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        text: TextSpan(
-                          style: TextStyle(fontSize: 12, color: t.text, fontFamily: 'SF Pro Display'),
-                          children: [
-                            TextSpan(text: r.borrower),
-                            TextSpan(
-                              text: ' (${r.notes.isNotEmpty ? r.notes : "—"})',
-                              style: TextStyle(fontSize: 10, color: t.textSec),
-                            ),
-                          ],
-                        ),
+          ...liveReceivables.map((r) {
+            final isReturned = r.isReturned;
+            final reasonText = r.reason.isNotEmpty ? r.reason : '—';
+            return Container(
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: t.withHexSuffix(t.accent, "22"), width: 1)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: RichText(
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        style: TextStyle(fontSize: 12, color: t.text, fontFamily: 'SF Pro Display'),
+                        children: [
+                          TextSpan(text: r.person),
+                          TextSpan(
+                            text: ' ($reasonText)',
+                            style: TextStyle(fontSize: 10, color: t.textSec),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      isReturned ? '✅ Returned' : '${fmt(remaining > 0 ? remaining : r.amountLent, currency)} pending',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: isReturned ? t.success : t.danger,
-                      ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isReturned ? '✅ Returned' : '${fmt(r.remaining, currency)} pending',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: isReturned ? t.success : t.danger,
                     ),
-                  ],
-                ),
-              );
-            })
-          else ...[
-            _buildSampleLentRow("Rahim Brothers Ltd", "(Wholesale consign)", "${fmt(5000, currency)} pending", false, t),
-          ],
+                  ),
+                ],
+              ),
+            );
+          }),
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Row(
@@ -1366,46 +1322,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: t.accent),
                 ),
                 Text(
-                  fmt(totalMoneyLent > 0 ? totalMoneyLent : 5000, currency),
+                  fmt(totalMoneyLent, currency),
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: t.danger),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSampleLentRow(String debtor, String reason, String rightText, bool isReturned, ThemeTokens t) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: t.withHexSuffix(t.accent, "22"), width: 1)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: RichText(
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              text: TextSpan(
-                style: TextStyle(fontSize: 12, color: t.text, fontFamily: 'SF Pro Display'),
-                children: [
-                  TextSpan(text: debtor),
-                  TextSpan(text: ' $reason', style: TextStyle(fontSize: 10, color: t.textSec)),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            rightText,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: isReturned ? t.success : t.danger,
             ),
           ),
         ],
@@ -1419,7 +1339,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
     List<Investor> liveInvestors,
     double totalToInvestors,
     double ownerProfit,
+    double netProfitYear,
   ) {
+    if (liveInvestors.isEmpty) return const SizedBox.shrink();
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1440,44 +1363,38 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ),
           ),
           const SizedBox(height: 6),
-          if (liveInvestors.isNotEmpty)
-            ...liveInvestors.map((i) {
-              final share = i.profitSharePercentage > 0 ? i.profitSharePercentage : i.ownershipPercentage;
-              final shareAmt = 7320.0 * (share / 100);
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: RichText(
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        text: TextSpan(
-                          style: TextStyle(fontSize: 12, color: t.text, fontFamily: 'SF Pro Display'),
-                          children: [
-                            TextSpan(text: i.name),
-                            TextSpan(
-                              text: ' ($share% · invested ${fmt(i.initialInvestedAmount, currency)})',
-                              style: TextStyle(fontSize: 10, color: t.textSec),
-                            ),
-                          ],
-                        ),
+          ...liveInvestors.map((i) {
+            final shareAmt = i.calculateProfitDue(netProfitYear);
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: RichText(
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      text: TextSpan(
+                        style: TextStyle(fontSize: 12, color: t.text, fontFamily: 'SF Pro Display'),
+                        children: [
+                          TextSpan(text: i.name),
+                          TextSpan(
+                            text: ' (${i.profitShare.toStringAsFixed(0)}% · invested ${fmt(i.totalInvested, currency)})',
+                            style: TextStyle(fontSize: 10, color: t.textSec),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      fmt(shareAmt, currency),
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: t.purple),
-                    ),
-                  ],
-                ),
-              );
-            })
-          else ...[
-            _buildSampleInvestorRow("Sarah Jenkins", "25%", 50000, 1830, currency, t),
-            _buildSampleInvestorRow("Michael Chen", "15%", 30000, 1098, currency, t),
-          ],
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    fmt(shareAmt, currency),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: t.purple),
+                  ),
+                ],
+              ),
+            );
+          }),
           Padding(
             padding: const EdgeInsets.only(top: 8, bottom: 4),
             child: Row(
@@ -1499,38 +1416,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
               Text('🏆 Owner’s Profit', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: t.success)),
               Text(fmt(ownerProfit, currency), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: t.success)),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSampleInvestorRow(String name, String share, num invested, num shareAmt, String currency, ThemeTokens t) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: RichText(
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              text: TextSpan(
-                style: TextStyle(fontSize: 12, color: t.text, fontFamily: 'SF Pro Display'),
-                children: [
-                  TextSpan(text: name),
-                  TextSpan(
-                    text: ' ($share · invested ${fmt(invested, currency)})',
-                    style: TextStyle(fontSize: 10, color: t.textSec),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            fmt(shareAmt, currency),
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: t.purple),
           ),
         ],
       ),
